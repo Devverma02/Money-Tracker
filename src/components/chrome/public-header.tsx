@@ -13,7 +13,7 @@ export async function PublicHeader() {
       <div className="shell-card relative rounded-[1rem] px-4 py-3 sm:px-5">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-sm font-bold text-white">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-700/20 bg-emerald-900 text-sm font-bold text-white">
               MM
             </span>
             <div>
