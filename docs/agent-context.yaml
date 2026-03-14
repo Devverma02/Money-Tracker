@@ -1,0 +1,116 @@
+project:
+  name: AI Money Assistant
+  repo_type: web-app
+  status: scaffolded-foundation-in-progress
+  primary_goal: trust-first Hindi Hinglish voice money assistant
+
+stack:
+  frontend:
+    - Next.js
+    - React
+    - TypeScript
+    - Tailwind CSS
+  backend:
+    - Next.js API routes
+    - Prisma ORM
+    - Supabase Postgres
+    - Supabase Auth
+  ai:
+    - OpenAI parser layer
+    - OpenAI Ask-AI layer
+    - OpenAI speech-to-text
+
+architecture:
+  money_truth: structured_ledger
+  summary_truth: computed_aggregates_only
+  ai_write_policy: ai_can_suggest_but_not_mutate
+  correction_model: effective_rows_plus_append_only_corrections
+  reminder_model: separate_state_machine
+
+product_principles:
+  - trust-first UX
+  - confirmation mandatory on ambiguity
+  - correction is first-class
+  - structured ledger is source of truth
+  - AI must never silently mutate money records
+  - numbers first, narrative second
+
+core_modules:
+  - auth
+  - parser
+  - clarification
+  - confirmation
+  - ledger engine
+  - corrections
+  - summaries
+  - ask-ai
+  - reminders
+  - audit and observability
+
+environment_rules:
+  required_env:
+    - NEXT_PUBLIC_SUPABASE_URL
+    - NEXT_PUBLIC_SUPABASE_ANON_KEY
+    - SUPABASE_SERVICE_ROLE_KEY
+    - DATABASE_URL
+    - DIRECT_URL
+    - OPENAI_API_KEY
+    - OPENAI_MODEL
+    - STT_PROVIDER
+  secrets_client_safe:
+    - NEXT_PUBLIC_SUPABASE_ANON_KEY
+  secrets_server_only:
+    - SUPABASE_SERVICE_ROLE_KEY
+    - OPENAI_API_KEY
+
+repo_commands:
+  install:
+    - npm install
+  dev:
+    - npm run dev
+  build:
+    - npm run build
+  test:
+    - npm run typecheck
+  lint:
+    - npm run lint
+
+trust_guardrails:
+  - parser may suggest but cannot mutate without explicit confirmation
+  - ledger writes must stay deterministic
+  - corrections are append-only via EntryCorrection events
+  - dashboard summaries must read from structured ledger records only
+
+runtime_notes:
+  prisma_runtime_database_url: transaction_pooler_with_pgbouncer
+  prisma_direct_url: direct_db_or_session_pooler
+  prisma_dev_client: recreates_when_runtime_database_url_changes
+
+testing_rules:
+  - parser changes require regression coverage
+  - money mutations require trust-path validation
+  - summaries must be checked against structured fixtures
+  - ambiguity flows must test clarification behavior
+  - AI outputs must be schema validated before use
+
+feature_boundaries:
+  must_exist_in_v1:
+    - Google auth
+    - voice and text entry
+    - clarification and confirmation flow
+    - ledger writes
+    - corrections
+    - summaries
+    - ask-ai from aggregates
+    - reminders
+  future_ready:
+    - offline sync
+    - family accounts
+    - advanced observability
+    - richer insights
+
+agent_expectations:
+  - inspect repo evidence before coding
+  - prefer existing patterns over new abstractions
+  - update this file when architecture or workflow changes
+  - never bypass trust rules for speed

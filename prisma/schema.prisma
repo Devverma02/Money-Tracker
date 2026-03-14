@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PreferredLanguage {
+  HINDI
+  HINGLISH
+  ENGLISH
+}
+
+enum BucketKind {
+  PERSONAL
+  GHAR
+  DUKAAN
+  KHETI
+  CUSTOM
+}
+
+enum SourceMode {
+  TEXT
+  VOICE
+  MANUAL
+  IMPORT
+}
+
+enum EntryType {
+  EXPENSE
+  INCOME
+  LOAN_GIVEN
+  LOAN_TAKEN
+  LOAN_RECEIVED_BACK
+  LOAN_REPAID
+  SAVINGS_DEPOSIT
+  NOTE
+  REMINDER
+}
+
+enum ReminderStatus {
+  PENDING
+  DONE
+  SNOOZED
+  OVERDUE
+  CANCELLED
+}
+
+model AppProfile {
+  id                String              @id @db.Uuid
+  email             String?             @unique
+  displayName       String?
+  preferredLanguage PreferredLanguage   @default(HINGLISH)
+  timezone          String              @default("Asia/Kolkata")
+  defaultBucketId   String?             @db.Uuid
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  defaultBucket     Bucket?             @relation("DefaultBucket", fields: [defaultBucketId], references: [id], onDelete: SetNull)
+  buckets           Bucket[]            @relation("ProfileBuckets")
+  ledgerEntries     LedgerEntry[]
+  reminders         Reminder[]
+  corrections       EntryCorrection[]   @relation("CorrectionActor")
+  auditLogs         AuditLog[]          @relation("AuditActor")
+}
+
+model Bucket {
+  id                 String       @id @default(uuid()) @db.Uuid
+  userId             String       @db.Uuid
+  name               String
+  slug               String
+  kind               BucketKind   @default(PERSONAL)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  user               AppProfile   @relation("ProfileBuckets", fields: [userId], references: [id], onDelete: Cascade)
+  defaultForProfiles AppProfile[] @relation("DefaultBucket")
+  ledgerEntries      LedgerEntry[]
+  reminders          Reminder[]
+
+  @@unique([userId, slug])
+  @@index([userId, kind])
+}
+
+model LedgerEntry {
+  id                   String            @id @default(uuid()) @db.Uuid
+  userId               String            @db.Uuid
+  bucketId             String?           @db.Uuid
+  sourceMode           SourceMode        @default(TEXT)
+  sourceText           String?
+  amount               Decimal           @db.Decimal(12, 2)
+  entryType            EntryType
+  category             String?
+  entryDate            DateTime
+  personName           String?
+  note                 String?
+  parserConfidence     Decimal?          @db.Decimal(4, 3)
+  requiresConfirmation Boolean           @default(false)
+  duplicateFingerprint String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  user                 AppProfile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bucket               Bucket?           @relation(fields: [bucketId], references: [id], onDelete: SetNull)
+  corrections          EntryCorrection[]
+  reminders            Reminder[]
+
+  @@index([userId, entryDate])
+  @@index([userId, personName])
+  @@index([userId, duplicateFingerprint])
+}
+
+model EntryCorrection {
+  id             String      @id @default(uuid()) @db.Uuid
+  entryId        String      @db.Uuid
+  actorUserId    String      @db.Uuid
+  reason         String?
+  sourceText     String?
+  beforeSnapshot Json
+  afterSnapshot  Json
+  createdAt      DateTime    @default(now())
+  entry          LedgerEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  actor          AppProfile  @relation("CorrectionActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([entryId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model Reminder {
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String         @db.Uuid
+  bucketId     String?        @db.Uuid
+  title        String
+  linkedPerson String?
+  linkedEntryId String?       @db.Uuid
+  dueAt        DateTime
+  status       ReminderStatus @default(PENDING)
+  snoozeUntil  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  user         AppProfile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bucket       Bucket?        @relation(fields: [bucketId], references: [id], onDelete: SetNull)
+  linkedEntry  LedgerEntry?   @relation(fields: [linkedEntryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, dueAt])
+}
+
+model AuditLog {
+  id            String     @id @default(uuid()) @db.Uuid
+  correlationId String
+  actorUserId   String     @db.Uuid
+  eventType     String
+  entityType    String
+  entityId      String
+  maskedPayload Json
+  createdAt     DateTime   @default(now())
+  actor         AppProfile @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId, createdAt])
+  @@index([correlationId])
+}
