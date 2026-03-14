@@ -27,15 +27,7 @@ export default async function DashboardLayout({
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-sm font-bold text-white">
                 MM
               </div>
-              <div>
-                <p className="eyebrow text-brand">Workspace</p>
-                <h1 className="mt-1 font-mono text-xl font-semibold text-slate-950 sm:text-2xl">
-                  {user.user_metadata?.full_name ?? user.email ?? "MoneyManage user"}
-                </h1>
-                <p className="text-sm text-slate-500">
-                  Review-first tracking, reminders, history, and AI help.
-                </p>
-              </div>
+              <span className="text-base font-semibold text-slate-950">MoneyManage</span>
             </div>
 
             <div className="hidden items-center gap-3 lg:flex">
