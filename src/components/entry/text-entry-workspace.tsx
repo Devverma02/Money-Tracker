@@ -303,7 +303,7 @@ export function TextEntryWorkspace({
 
   return (
     <section className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
-      <div className="shell-card rounded-[2rem] p-6 sm:p-7">
+      <div className="shell-card rounded-[1rem] p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="eyebrow text-brand">Quick entry</p>
@@ -315,7 +315,7 @@ export function TextEntryWorkspace({
               previews before anything is saved.
             </p>
           </div>
-          <div className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-sm font-medium text-slate-600">
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600">
             Bucket: {defaultBucket}
           </div>
         </div>
@@ -343,7 +343,7 @@ export function TextEntryWorkspace({
           ))}
         </div>
 
-        <details className="mt-4 rounded-[1.4rem] border border-slate-200 bg-white/80 p-4">
+        <details className="mt-4 rounded-[0.9rem] border border-slate-200 bg-white p-4">
           <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
             Show voice options
           </summary>
@@ -361,14 +361,14 @@ export function TextEntryWorkspace({
                 type="button"
                 onClick={isListening ? stopListening : startListening}
                 disabled={isParsing || isSaving}
-                className={`rounded-full px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
+                className={`rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
                   isListening ? "bg-emerald-700" : "primary-button"
                 }`}
               >
                 {isListening ? "Stop mic" : "Start mic"}
               </button>
             ) : (
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <span className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Browser mic not supported
               </span>
             )}
@@ -401,7 +401,7 @@ export function TextEntryWorkspace({
             type="button"
             onClick={handleParse}
             disabled={isParsing || isSaving || inputText.trim().length < 2}
-            className="primary-button rounded-full px-6 py-3.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+            className="primary-button rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isParsing ? "Reviewing..." : "Generate preview"}
           </button>
@@ -409,7 +409,7 @@ export function TextEntryWorkspace({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="secondary-button rounded-full px-6 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            className="secondary-button rounded-lg px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving ? "Saving..." : saveButtonLabel}
           </button>
@@ -435,15 +435,15 @@ export function TextEntryWorkspace({
       </div>
 
       <div className="grid gap-4">
-        <div className="soft-card rounded-[2rem] p-5 sm:p-6">
+        <div className="soft-card rounded-[1rem] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <p className="eyebrow text-brand">Preview</p>
             {result ? (
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                <span className="rounded-full bg-brand-soft px-3 py-1 text-brand">
+                <span className="rounded-lg bg-brand-soft px-3 py-1 text-brand">
                   {result.parserMode}
                 </span>
-                <span className="rounded-full bg-white px-3 py-1">
+                <span className="rounded-lg bg-white px-3 py-1">
                   {Math.round(result.confidence * 100)}% confidence
                 </span>
               </div>
@@ -451,7 +451,7 @@ export function TextEntryWorkspace({
           </div>
 
           {!result ? (
-            <div className="mt-4 rounded-[1.5rem] border border-dashed border-slate-300/80 bg-white/60 px-5 py-7 text-sm leading-7 text-slate-500">
+            <div className="mt-4 rounded-[0.95rem] border border-dashed border-slate-300/80 bg-white px-5 py-7 text-sm leading-7 text-slate-500">
               No preview yet. Enter one or more money updates and review each parsed
               item here.
             </div>
@@ -459,7 +459,7 @@ export function TextEntryWorkspace({
             <div className="mt-4 space-y-4">
               <p className="text-sm leading-7 text-slate-600">{result.summaryText}</p>
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[1.2rem] bg-white px-4 py-4 text-sm">
+                <div className="rounded-[0.85rem] bg-white px-4 py-4 text-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Total found
                   </p>
@@ -467,7 +467,7 @@ export function TextEntryWorkspace({
                     {result.actions.length}
                   </p>
                 </div>
-                <div className="rounded-[1.2rem] bg-white px-4 py-4 text-sm">
+                <div className="rounded-[0.85rem] bg-white px-4 py-4 text-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Ready now
                   </p>
@@ -475,7 +475,7 @@ export function TextEntryWorkspace({
                     {readyCount}
                   </p>
                 </div>
-                <div className="rounded-[1.2rem] bg-white px-4 py-4 text-sm">
+                <div className="rounded-[0.85rem] bg-white px-4 py-4 text-sm">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Selected
                   </p>
@@ -504,14 +504,14 @@ export function TextEntryWorkspace({
                   <button
                     type="button"
                     onClick={() => setSelectedIndexes(readyIndexes)}
-                    className="secondary-button rounded-full px-4 py-2 text-xs font-semibold"
+                    className="secondary-button rounded-lg px-4 py-2 text-xs font-semibold"
                   >
                     Select all ready
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedIndexes([])}
-                    className="secondary-button rounded-full px-4 py-2 text-xs font-semibold"
+                    className="secondary-button rounded-lg px-4 py-2 text-xs font-semibold"
                   >
                     Clear selection
                   </button>
@@ -537,7 +537,7 @@ export function TextEntryWorkspace({
           );
         })}
 
-        <details className="soft-card rounded-[1.8rem] p-5 sm:p-6">
+        <details className="soft-card rounded-[1rem] p-4 sm:p-5">
           <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
             Show live voice assistant
           </summary>

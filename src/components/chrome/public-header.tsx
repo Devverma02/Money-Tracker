@@ -9,45 +9,43 @@ export async function PublicHeader() {
   } = await supabase.auth.getUser();
 
   return (
-    <header className="mx-auto w-full max-w-7xl px-5 pt-6 sm:px-8 lg:px-10">
-      <div className="shell-card rounded-[1.8rem] px-5 py-4 sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <Link href="/" className="inline-flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white shadow-[0_16px_40px_rgba(10,17,40,0.18)]">
-                MM
+    <header className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+      <div className="shell-card relative rounded-[1rem] px-4 py-3 sm:px-5">
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-sm font-bold text-white">
+              MM
+            </span>
+            <div>
+              <span className="block text-base font-semibold text-slate-950">
+                MoneyManage
               </span>
-              <span>
-                <span className="block text-lg font-semibold text-slate-950">
-                  MoneyManage
-                </span>
-                <span className="block text-sm text-slate-500">
-                  Secure personal finance workspace
-                </span>
+              <span className="block text-xs text-slate-500">
+                Trust-first finance workspace
               </span>
-            </Link>
-          </div>
+            </div>
+          </Link>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="hidden items-center gap-3 lg:flex">
             <nav className="flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
-              <Link href="/" className="nav-link rounded-full px-4 py-2">
+              <Link href="/" className="nav-link rounded-lg px-3 py-2">
                 Home
               </Link>
-              <Link href="/dashboard" className="nav-link rounded-full px-4 py-2">
+              <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
                 Dashboard
               </Link>
-              <Link href="/reminders" className="nav-link rounded-full px-4 py-2">
+              <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
                 Reminders
               </Link>
-              <Link href="/history" className="nav-link rounded-full px-4 py-2">
+              <Link href="/history" className="nav-link rounded-lg px-3 py-2">
                 History
               </Link>
             </nav>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               {user ? (
                 <>
-                  <span className="rounded-full border border-white/60 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700">
+                  <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                     {user.user_metadata?.full_name ?? user.email ?? "Signed in"}
                   </span>
                   <SignOutButton />
@@ -55,13 +53,53 @@ export async function PublicHeader() {
               ) : (
                 <Link
                   href="/login"
-                  className="primary-button rounded-full px-5 py-3 text-sm font-semibold text-white"
+                  className="primary-button rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
                 >
-                  Sign in with Google
+                  Sign in
                 </Link>
               )}
             </div>
           </div>
+
+          <details className="group lg:hidden">
+            <summary className="flex list-none items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+              Menu
+            </summary>
+            <div className="absolute right-4 top-[4.75rem] z-30 w-[min(20rem,calc(100vw-2rem))] rounded-[1rem] border border-slate-200 bg-white p-3 shadow-[0_18px_40px_rgba(16,24,40,0.12)] sm:right-6">
+              <nav className="grid gap-1 text-sm font-semibold text-slate-700">
+                <Link href="/" className="nav-link rounded-lg px-3 py-2">
+                  Home
+                </Link>
+                <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
+                  Dashboard
+                </Link>
+                <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
+                  Reminders
+                </Link>
+                <Link href="/history" className="nav-link rounded-lg px-3 py-2">
+                  History
+                </Link>
+              </nav>
+
+              <div className="mt-3 border-t border-slate-200 pt-3">
+                {user ? (
+                  <div className="grid gap-2">
+                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                      {user.user_metadata?.full_name ?? user.email ?? "Signed in"}
+                    </span>
+                    <SignOutButton />
+                  </div>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="primary-button inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Sign in
+                  </Link>
+                )}
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </header>

@@ -29,7 +29,7 @@ export function ParsePreviewCard({
   onToggleSelect,
 }: ParsePreviewCardProps) {
   return (
-    <article className="soft-card rounded-[1.8rem] p-5 sm:p-6">
+    <article className="soft-card rounded-[1rem] p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="eyebrow text-brand">Action {index + 1}</p>
@@ -50,7 +50,7 @@ export function ParsePreviewCard({
             {isReadyToSave ? "Ready to save" : "Clarification needed"}
           </p>
           {canSelect ? (
-            <label className="mt-1 inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700">
+            <label className="mt-1 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-700">
               <input
                 type="checkbox"
                 checked={isSelected}
@@ -64,23 +64,23 @@ export function ParsePreviewCard({
       </div>
 
       <div className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-        <div className="rounded-[1.2rem] bg-white/80 px-4 py-3">
+        <div className="rounded-[0.85rem] bg-white px-4 py-3">
           Bucket
           <p className="mt-1 font-semibold text-slate-900">{action.bucket ?? "Not set"}</p>
         </div>
-        <div className="rounded-[1.2rem] bg-white/80 px-4 py-3">
+        <div className="rounded-[0.85rem] bg-white px-4 py-3">
           Date
           <p className="mt-1 font-semibold text-slate-900">
             {action.resolvedDate ?? "Not set"}
           </p>
         </div>
-        <div className="rounded-[1.2rem] bg-white/80 px-4 py-3">
+        <div className="rounded-[0.85rem] bg-white px-4 py-3">
           Category
           <p className="mt-1 font-semibold text-slate-900">
             {action.category ?? "Not set"}
           </p>
         </div>
-        <div className="rounded-[1.2rem] bg-white/80 px-4 py-3">
+        <div className="rounded-[0.85rem] bg-white px-4 py-3">
           Person
           <p className="mt-1 font-semibold text-slate-900">
             {action.personName ?? "Not set"}
@@ -88,7 +88,7 @@ export function ParsePreviewCard({
         </div>
       </div>
 
-      <div className="mt-5 rounded-[1.4rem] border border-white/70 bg-white/70 px-4 py-4 text-sm leading-7 text-slate-600">
+      <div className="mt-5 rounded-[0.9rem] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-600">
         <span className="font-semibold text-slate-950">Source text:</span>{" "}
         {action.sourceText}
       </div>

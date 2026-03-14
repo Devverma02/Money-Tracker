@@ -12,8 +12,9 @@ export function useBrowserVoice(options: UseBrowserVoiceOptions = {}) {
   const [isListening, setIsListening] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const finalTranscriptRef = useRef("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const callbackRef = useRef<typeof onFinalTranscript>(onFinalTranscript);
 
   useEffect(() => {
@@ -21,122 +22,151 @@ export function useBrowserVoice(options: UseBrowserVoiceOptions = {}) {
   }, [onFinalTranscript]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const Recognition =
-      window.SpeechRecognition ?? window.webkitSpeechRecognition;
-
-    if (!Recognition) {
-      return;
-    }
-
-    const recognition = new Recognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = locale;
-
-    recognition.onresult = (event) => {
-      let nextFinal = "";
-      let nextInterim = "";
-
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        const transcript = result[0]?.transcript?.trim() ?? "";
-
-        if (!transcript) {
-          continue;
-        }
-
-        if (result.isFinal) {
-          nextFinal += `${transcript} `;
-        } else {
-          nextInterim += `${transcript} `;
-        }
-      }
-
-      if (nextFinal) {
-        finalTranscriptRef.current = `${finalTranscriptRef.current} ${nextFinal}`.trim();
-      }
-
-      setLiveTranscript(`${finalTranscriptRef.current} ${nextInterim}`.trim());
-    };
-
-    recognition.onerror = (event) => {
-      setIsListening(false);
-
-      if (event.error === "not-allowed") {
-        setError("Microphone permission is blocked.");
-        return;
-      }
-
-      if (event.error === "no-speech") {
-        setError("No speech was detected. Please try again.");
-        return;
-      }
-
-      setError("Voice capture failed. Please try again.");
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      const finalTranscript = finalTranscriptRef.current.trim();
-
-      if (finalTranscript) {
-        void callbackRef.current?.(finalTranscript);
-      }
-    };
-
-    recognitionRef.current = recognition;
-
     return () => {
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      recognition.abort();
-      recognitionRef.current = null;
+      mediaRecorderRef.current?.stop();
+      mediaRecorderRef.current = null;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     };
-  }, [locale]);
+  }, []);
 
   const isSupported = useSyncExternalStore(
     () => () => undefined,
     () =>
       typeof window !== "undefined" &&
-      !!(window.SpeechRecognition ?? window.webkitSpeechRecognition),
+      !!navigator.mediaDevices?.getUserMedia &&
+      typeof window.MediaRecorder !== "undefined",
     () => false,
   );
 
-  const resetTranscript = () => {
-    finalTranscriptRef.current = "";
-    setLiveTranscript("");
+  const resetRecorder = () => {
+    mediaRecorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    chunksRef.current = [];
+    setIsListening(false);
   };
 
-  const startListening = () => {
-    const recognition = recognitionRef.current;
+  const transcribeRecording = async (audioBlob: Blob) => {
+    const formData = new FormData();
+    const mimeType = audioBlob.type || "audio/webm";
+    const extension = mimeType.includes("mp4") || mimeType.includes("mpeg") ? "mp3" : "webm";
+    formData.append(
+      "audio",
+      new File([audioBlob], `speech.${extension}`, {
+        type: mimeType,
+      }),
+    );
+    formData.append("locale", locale);
 
-    if (!recognition) {
-      setError("This browser does not support live voice capture.");
+    const response = await fetch("/api/transcribe", {
+      method: "POST",
+      body: formData,
+    });
+
+    const payload = (await response.json()) as {
+      text?: string;
+      error?: string;
+    };
+
+    if (!response.ok || !payload.text) {
+      throw new Error(
+        payload.error ?? "OpenAI transcription could not understand the audio.",
+      );
+    }
+
+    return payload.text.trim();
+  };
+
+  const startListening = async () => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.MediaRecorder === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      setError("This browser does not support microphone recording.");
       return;
     }
 
-    finalTranscriptRef.current = "";
-    setLiveTranscript("");
-    setError(null);
-    setIsListening(true);
-    recognition.lang = locale;
-    window.speechSynthesis.cancel();
-
     try {
-      recognition.start();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      streamRef.current = stream;
+      chunksRef.current = [];
+      setError(null);
+      setLiveTranscript("");
+      window.speechSynthesis.cancel();
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : undefined,
+      });
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        setError("Voice recording failed. Please try again.");
+        resetRecorder();
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(chunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        resetRecorder();
+
+        if (audioBlob.size === 0) {
+          setError("No speech was captured. Please try again.");
+          return;
+        }
+
+        setLiveTranscript("Transcribing with OpenAI...");
+
+        void (async () => {
+          try {
+            const transcript = await transcribeRecording(audioBlob);
+            setLiveTranscript(transcript);
+            await callbackRef.current?.(transcript);
+          } catch (caughtError) {
+            setLiveTranscript("");
+            setError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : "Transcription failed. Please try again.",
+            );
+          }
+        })();
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsListening(true);
     } catch {
-      setIsListening(false);
-      setError("Microphone could not start. Please try again.");
+      resetRecorder();
+      setError("Microphone permission is blocked or recording could not start.");
     }
   };
 
   const stopListening = () => {
-    recognitionRef.current?.stop();
+    const recorder = mediaRecorderRef.current;
+
+    if (!recorder || recorder.state === "inactive") {
+      return;
+    }
+
+    recorder.stop();
   };
 
   const speakText = (text: string, language = "en-IN") => {
@@ -159,7 +189,6 @@ export function useBrowserVoice(options: UseBrowserVoiceOptions = {}) {
     error,
     startListening,
     stopListening,
-    resetTranscript,
     speakText,
   };
 }

@@ -16,6 +16,44 @@ function buildFallbackAnswer(facts: AskAiFacts): AskAiResponse {
     `${facts.summary.label} total entries ${facts.summary.entryCount}`,
   ];
 
+  if (/last transaction|latest entry|recent entry|recent transaction|last entry/.test(normalized)) {
+    const latestEntry = facts.recentEntries[0];
+
+    if (!latestEntry) {
+      return {
+        answerText: "No recent saved entry is visible in the current records.",
+        factualPoints,
+        uncertaintyNote: null,
+        parserMode: "deterministic",
+        resolvedPeriod: facts.resolvedPeriod,
+        resolvedPeriodLabel: facts.resolvedPeriodLabel,
+      };
+    }
+
+    return {
+      answerText: `The latest saved item is ${latestEntry.entryType.toLowerCase().replaceAll("_", " ")} of Rs ${latestEntry.amount} on ${latestEntry.entryDate.slice(0, 10)}.`,
+      factualPoints: [
+        ...factualPoints,
+        `Latest item Rs ${latestEntry.amount} | ${latestEntry.entryType.toLowerCase().replaceAll("_", " ")} | ${latestEntry.entryDate.slice(0, 10)}`,
+      ].slice(0, 6),
+      uncertaintyNote: latestEntry.note ? `Saved note: ${latestEntry.note}` : null,
+      parserMode: "deterministic",
+      resolvedPeriod: facts.resolvedPeriod,
+      resolvedPeriodLabel: facts.resolvedPeriodLabel,
+    };
+  }
+
+  if (/\b(how many|kitni|kitne|count|entries)\b/.test(normalized)) {
+    return {
+      answerText: `${facts.summary.label} has ${facts.totalMatchingEntries} matching saved entries.`,
+      factualPoints,
+      uncertaintyNote: null,
+      parserMode: "deterministic",
+      resolvedPeriod: facts.resolvedPeriod,
+      resolvedPeriodLabel: facts.resolvedPeriodLabel,
+    };
+  }
+
   if (/udhaar|loan/.test(normalized)) {
     if (facts.pendingLoans.length === 0) {
       return {
@@ -24,6 +62,7 @@ function buildFallbackAnswer(facts: AskAiFacts): AskAiResponse {
         uncertaintyNote: null,
         parserMode: "deterministic",
         resolvedPeriod: facts.resolvedPeriod,
+        resolvedPeriodLabel: facts.resolvedPeriodLabel,
       };
     }
 
@@ -43,6 +82,7 @@ function buildFallbackAnswer(facts: AskAiFacts): AskAiResponse {
       uncertaintyNote: null,
       parserMode: "deterministic",
       resolvedPeriod: facts.resolvedPeriod,
+      resolvedPeriodLabel: facts.resolvedPeriodLabel,
     };
   }
 
@@ -63,6 +103,7 @@ function buildFallbackAnswer(facts: AskAiFacts): AskAiResponse {
           : null,
       parserMode: "deterministic",
       resolvedPeriod: facts.resolvedPeriod,
+      resolvedPeriodLabel: facts.resolvedPeriodLabel,
     };
   }
 
@@ -73,6 +114,7 @@ function buildFallbackAnswer(facts: AskAiFacts): AskAiResponse {
       uncertaintyNote: null,
       parserMode: "deterministic",
       resolvedPeriod: facts.resolvedPeriod,
+      resolvedPeriodLabel: facts.resolvedPeriodLabel,
     };
   }
 
@@ -85,6 +127,7 @@ function buildFallbackAnswer(facts: AskAiFacts): AskAiResponse {
         : null,
     parserMode: "deterministic",
     resolvedPeriod: facts.resolvedPeriod,
+    resolvedPeriodLabel: facts.resolvedPeriodLabel,
   };
 }
 
@@ -142,7 +185,7 @@ async function askWithOpenAI(facts: AskAiFacts): Promise<AskAiResponse> {
         {
           role: "system",
           content:
-            "You answer money questions for a trust-first Hindi Hinglish assistant. Use only provided structured facts. Do not invent numbers. Keep the answer simple and non-judgmental.",
+            "You answer money questions for a trust-first Hindi Hinglish assistant. Use only provided structured facts. Do not invent numbers. Keep the answer simple and non-judgmental. If the facts include a person filter, category filter, recent entries, or a custom time label, reflect that clearly in the answer.",
         },
         {
           role: "user",
@@ -182,6 +225,7 @@ async function askWithOpenAI(facts: AskAiFacts): Promise<AskAiResponse> {
     ...parsed,
     parserMode: "openai",
     resolvedPeriod: facts.resolvedPeriod,
+    resolvedPeriodLabel: facts.resolvedPeriodLabel,
   });
 }
 

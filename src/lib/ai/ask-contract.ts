@@ -10,7 +10,8 @@ export const askAiResponseSchema = z.object({
   factualPoints: z.array(z.string().min(1)).max(6),
   uncertaintyNote: z.string().nullable(),
   parserMode: z.enum(["openai", "deterministic"]),
-  resolvedPeriod: z.enum(["today", "week", "month", "overall"]),
+  resolvedPeriod: z.enum(["today", "week", "month", "year", "overall", "custom"]),
+  resolvedPeriodLabel: z.string().min(1),
 });
 
 export type AskAiRequest = z.infer<typeof askAiRequestSchema>;
@@ -35,8 +36,9 @@ export const askAiJsonSchema = {
     },
     resolvedPeriod: {
       type: "string",
-      enum: ["today", "week", "month", "overall"],
+      enum: ["today", "week", "month", "year", "overall", "custom"],
     },
+    resolvedPeriodLabel: { type: "string" },
   },
   required: [
     "answerText",
@@ -44,5 +46,6 @@ export const askAiJsonSchema = {
     "uncertaintyNote",
     "parserMode",
     "resolvedPeriod",
+    "resolvedPeriodLabel",
   ],
 } as const;

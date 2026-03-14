@@ -54,6 +54,8 @@ async function parseWithOpenAI(request: ParseRequest): Promise<ParseResult> {
     "Return only schema-valid JSON.",
     "Split multi-entry input into separate actions when the user mentions more than one money update.",
     "Never invent amounts, dates, or people.",
+    "Resolve explicit dates like day/month, month names, and weekdays when the user provides them.",
+    "Normalize obvious person-name honorifics and common spending categories when present in the text.",
     "If any key money fact is unclear, set needsClarification=true and ask one short Hinglish clarification question.",
     "Default unresolved bucket to the first allowed bucket.",
     "This parser only suggests actions. It does not save data.",

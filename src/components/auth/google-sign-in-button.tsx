@@ -32,7 +32,7 @@ export function GoogleSignInButton() {
         type="button"
         onClick={handleLogin}
         disabled={isPending}
-        className="primary-button inline-flex w-full items-center justify-center rounded-full px-5 py-3.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+        className="primary-button inline-flex w-full items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
       >
         {isPending ? "Signing you in..." : "Continue with Google"}
       </button>

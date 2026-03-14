@@ -29,21 +29,21 @@ export default async function DashboardPage() {
 
   return (
     <section className="grid gap-5">
-      <div className="shell-card rounded-[2rem] p-6 sm:p-7">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className="shell-card rounded-[1rem] p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="eyebrow text-brand">Dashboard</p>
-            <h2 className="mt-3 font-mono text-3xl font-semibold text-slate-950 sm:text-4xl">
+            <h2 className="mt-2 font-mono text-3xl font-semibold text-slate-950 sm:text-4xl">
               Hello, {profile.displayName ?? "there"}
             </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-              Quick entry stays first. Everything else is visible below in a simpler
-              layout with optional sections when you need them.
+            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
+              Quick entry stays first. Everything else remains visible below in a simpler,
+              more compact workspace.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="soft-card rounded-[1.4rem] p-4">
+            <div className="soft-card rounded-[0.9rem] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Today
               </p>
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
                 {formatCurrency(summary.today.netCashMovement)}
               </p>
             </div>
-            <div className="soft-card rounded-[1.4rem] p-4">
+            <div className="soft-card rounded-[0.9rem] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 This week
               </p>
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
                 {formatCurrency(summary.week.netCashMovement)}
               </p>
             </div>
-            <div className="soft-card rounded-[1.4rem] p-4">
+            <div className="soft-card rounded-[0.9rem] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Active reminders
               </p>
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
         variant="dashboard"
       />
 
-      <details className="soft-card rounded-[1.8rem] p-5 sm:p-6">
+      <details className="soft-card rounded-[1rem] p-4 sm:p-5">
         <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
           Show Ask AI
         </summary>

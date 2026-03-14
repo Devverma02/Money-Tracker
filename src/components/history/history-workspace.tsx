@@ -102,7 +102,7 @@ export function HistoryWorkspace({ entries }: HistoryWorkspaceProps) {
 
   return (
     <section className="grid gap-5">
-      <div className="shell-card rounded-[2rem] p-6 sm:p-7">
+      <div className="shell-card rounded-[1rem] p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="eyebrow text-brand">History</p>
@@ -113,7 +113,7 @@ export function HistoryWorkspace({ entries }: HistoryWorkspaceProps) {
               Check old saves, open edit only when needed, and undo the latest correction if required.
             </p>
           </div>
-          <div className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-sm font-medium text-slate-600">
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600">
             {entries.length} entries
           </div>
         </div>
@@ -132,23 +132,23 @@ export function HistoryWorkspace({ entries }: HistoryWorkspaceProps) {
       </div>
 
       {entries.length === 0 ? (
-        <div className="soft-card rounded-[1.6rem] px-6 py-8 text-sm leading-7 text-slate-600">
+        <div className="soft-card rounded-[1rem] px-5 py-7 text-sm leading-7 text-slate-600">
           No saved entries yet. Create your first reviewed entry from the dashboard.
         </div>
       ) : null}
 
       {entries.map((entry) => (
-        <article key={entry.id} className="soft-card rounded-[1.5rem] p-5">
+        <article key={entry.id} className="soft-card rounded-[1rem] p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-mono text-2xl font-semibold text-slate-950">
                   {formatCurrency(entry.amount)}
                 </h3>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+                <span className="rounded-lg bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
                   {entry.entryType.replaceAll("_", " ")}
                 </span>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+                <span className="rounded-lg bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
                   {entry.entryDate.slice(0, 10)}
                 </span>
               </div>
@@ -173,7 +173,7 @@ export function HistoryWorkspace({ entries }: HistoryWorkspaceProps) {
                     current === entry.id ? null : entry.id,
                   )
                 }
-                className="secondary-button rounded-full px-4 py-2.5 text-sm font-semibold"
+                className="secondary-button rounded-lg px-4 py-2.5 text-sm font-semibold"
               >
                 {openEntryId === entry.id ? "Close edit" : "Edit"}
               </button>
@@ -181,7 +181,7 @@ export function HistoryWorkspace({ entries }: HistoryWorkspaceProps) {
                 type="button"
                 onClick={() => handleUndo(entry.id)}
                 disabled={isPending || entry.correctionCount === 0}
-                className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Undo
               </button>
@@ -202,7 +202,7 @@ export function HistoryWorkspace({ entries }: HistoryWorkspaceProps) {
           {openEntryId === entry.id ? (
             <form
               action={(formData) => handleCorrectionSubmit(entry.id, formData)}
-              className="mt-5 grid gap-4 rounded-[1.4rem] border border-white/70 bg-white/70 p-4 md:grid-cols-2"
+              className="mt-5 grid gap-4 rounded-[0.9rem] border border-slate-200 bg-white p-4 md:grid-cols-2"
             >
               <label className="text-sm font-semibold text-slate-700">
                 Updated amount
@@ -271,7 +271,7 @@ export function HistoryWorkspace({ entries }: HistoryWorkspaceProps) {
               <button
                 type="submit"
                 disabled={isPending}
-                className="primary-button rounded-full px-6 py-3.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 md:col-span-2"
+                className="primary-button rounded-lg px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 md:col-span-2"
               >
                 {isPending ? "Saving correction..." : "Save correction"}
               </button>

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 const realtimeSessionConfig = {
   session: {
     type: "realtime",
-    model: "gpt-realtime",
+    model: "gpt-4o-mini-realtime-preview",
     output_modalities: ["audio"],
     instructions:
       "You are MoneyManage, a trust-first voice money assistant. Speak in very short, natural Hinglish or simple English. Keep most replies under two short sentences. Prioritize speed and clarity. If the user mentions a transaction, reminder, or money update, briefly repeat what you heard and tell them to review the on-screen preview before anything can be saved. Never claim money was saved unless the app confirms it.",
@@ -65,12 +65,15 @@ export async function GET() {
   }
 
   const payload = (await response.json()) as {
+    value?: string;
+    expires_at?: number;
     client_secret?: {
       value?: string;
       expires_at?: number;
     };
   };
-  const clientSecret = payload.client_secret?.value;
+  const clientSecret = payload.value ?? payload.client_secret?.value;
+  const expiresAt = payload.expires_at ?? payload.client_secret?.expires_at ?? null;
 
   if (!clientSecret) {
     return NextResponse.json(
@@ -81,6 +84,6 @@ export async function GET() {
 
   return NextResponse.json({
     clientSecret,
-    expiresAt: payload.client_secret?.expires_at ?? null,
+    expiresAt,
   });
 }

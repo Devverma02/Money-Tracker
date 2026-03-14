@@ -20,45 +20,71 @@ export default async function DashboardLayout({
 
   return (
     <>
-      <main className="mx-auto min-h-screen w-full max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
-        <header className="shell-card sticky top-4 z-20 rounded-[1.9rem] px-5 py-4 sm:px-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-sm font-bold text-white shadow-[0_18px_45px_rgba(10,17,40,0.18)]">
+      <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+        <header className="shell-card relative sticky top-3 z-20 rounded-[1rem] px-4 py-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-sm font-bold text-white">
                 MM
               </div>
               <div>
-                <p className="eyebrow text-brand">Private workspace</p>
-                <h1 className="mt-1 font-mono text-2xl font-semibold text-slate-950">
+                <p className="eyebrow text-brand">Workspace</p>
+                <h1 className="mt-1 font-mono text-xl font-semibold text-slate-950 sm:text-2xl">
                   {user.user_metadata?.full_name ?? user.email ?? "MoneyManage user"}
                 </h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  Secure dashboard with confirmed saves, reminders, and history.
+                <p className="text-sm text-slate-500">
+                  Review-first tracking, reminders, history, and AI help.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="hidden items-center gap-3 lg:flex">
               <nav className="flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
-                <Link href="/dashboard" className="nav-link rounded-full px-4 py-2">
+                <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
                   Dashboard
                 </Link>
-                <Link href="/reminders" className="nav-link rounded-full px-4 py-2">
+                <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
                   Reminders
                 </Link>
-                <Link href="/history" className="nav-link rounded-full px-4 py-2">
+                <Link href="/history" className="nav-link rounded-lg px-3 py-2">
                   History
                 </Link>
-                <Link href="/" className="nav-link rounded-full px-4 py-2">
+                <Link href="/" className="nav-link rounded-lg px-3 py-2">
                   Home
                 </Link>
               </nav>
               <SignOutButton />
             </div>
+
+            <details className="group lg:hidden">
+              <summary className="flex list-none items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                Menu
+              </summary>
+              <div className="absolute right-4 top-[4.75rem] z-30 w-[min(20rem,calc(100vw-2rem))] rounded-[1rem] border border-slate-200 bg-white p-3 shadow-[0_18px_40px_rgba(16,24,40,0.12)] sm:right-6">
+                <nav className="grid gap-1 text-sm font-semibold text-slate-700">
+                  <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
+                    Dashboard
+                  </Link>
+                  <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
+                    Reminders
+                  </Link>
+                  <Link href="/history" className="nav-link rounded-lg px-3 py-2">
+                    History
+                  </Link>
+                  <Link href="/" className="nav-link rounded-lg px-3 py-2">
+                    Home
+                  </Link>
+                </nav>
+
+                <div className="mt-3 border-t border-slate-200 pt-3">
+                  <SignOutButton />
+                </div>
+              </div>
+            </details>
           </div>
         </header>
 
-        <div className="py-6">{children}</div>
+        <div className="py-4 sm:py-5">{children}</div>
       </main>
       <AppFooter />
     </>

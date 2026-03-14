@@ -42,7 +42,7 @@ export function DashboardSummaryPanel({
 
       <div className="grid gap-4 md:grid-cols-3">
         {summaryCards.map((card) => (
-          <article key={card.label} className="soft-card rounded-[1.5rem] p-5">
+          <article key={card.label} className="soft-card rounded-[1rem] p-4 sm:p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               {card.label}
             </p>
@@ -54,13 +54,13 @@ export function DashboardSummaryPanel({
         ))}
       </div>
 
-      <details className="soft-card rounded-[1.6rem] p-5">
+      <details className="soft-card rounded-[1rem] p-4 sm:p-5">
         <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
           Show more summary details
         </summary>
 
         <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_1fr]">
-          <article className="rounded-[1.3rem] border border-white/70 bg-white/75 p-4">
+          <article className="rounded-[0.9rem] border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Pending loans
             </p>
@@ -73,7 +73,7 @@ export function DashboardSummaryPanel({
                 {summary.pendingLoans.slice(0, 5).map((item) => (
                   <div
                     key={item.personName}
-                    className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3"
+                  className="rounded-[0.85rem] border border-slate-200 bg-white px-4 py-3"
                   >
                     <p className="font-semibold text-slate-950">{item.personName}</p>
                     <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
@@ -86,14 +86,14 @@ export function DashboardSummaryPanel({
             )}
           </article>
 
-          <article className="rounded-[1.3rem] border border-white/70 bg-white/75 p-4">
+          <article className="rounded-[0.9rem] border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Insight
             </p>
             <p className="mt-4 text-sm leading-7 text-slate-700">
               {summary.insightText}
             </p>
-            <div className="mt-4 rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-600">
+            <div className="mt-4 rounded-[0.85rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-600">
               {summary.topSpendingCategory ? (
                 <p>
                   Top spending category:{" "}

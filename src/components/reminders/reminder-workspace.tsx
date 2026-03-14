@@ -217,7 +217,7 @@ export function ReminderWorkspace({
 
   return (
     <section className="grid gap-5">
-      <div className="shell-card rounded-[2rem] p-6 sm:p-7">
+      <div className="shell-card rounded-[1rem] p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="eyebrow text-brand">Reminders</p>
@@ -228,7 +228,7 @@ export function ReminderWorkspace({
               Keep this page focused on create, due items, and closed reminders.
             </p>
           </div>
-          <div className="rounded-[1.4rem] border border-white/70 bg-white/75 px-4 py-3 text-sm font-medium text-slate-600">
+          <div className="rounded-[0.9rem] border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-600">
             {board.helperText}
           </div>
         </div>
@@ -246,7 +246,7 @@ export function ReminderWorkspace({
         ) : null}
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="soft-card rounded-[1.4rem] p-4">
+          <div className="soft-card rounded-[0.9rem] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Active
             </p>
@@ -254,7 +254,7 @@ export function ReminderWorkspace({
               {board.counts.active}
             </p>
           </div>
-          <div className="soft-card rounded-[1.4rem] p-4">
+          <div className="soft-card rounded-[0.9rem] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Overdue
             </p>
@@ -262,7 +262,7 @@ export function ReminderWorkspace({
               {board.counts.overdue}
             </p>
           </div>
-          <div className="soft-card rounded-[1.4rem] p-4">
+          <div className="soft-card rounded-[0.9rem] p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Closed
             </p>
@@ -277,7 +277,7 @@ export function ReminderWorkspace({
             <button
               type="button"
               onClick={() => setShowCreateForm((current) => !current)}
-              className="secondary-button rounded-full px-4 py-2 text-sm font-semibold"
+              className="secondary-button rounded-lg px-4 py-2 text-sm font-semibold"
             >
               {showCreateForm ? "Hide create reminder" : "Show create reminder"}
             </button>
@@ -285,7 +285,7 @@ export function ReminderWorkspace({
         ) : null}
 
         {showCreateForm ? (
-          <div className="soft-card mt-4 rounded-[1.6rem] p-5 sm:p-6">
+          <div className="soft-card mt-4 rounded-[1rem] p-5 sm:p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               Create reminder
             </p>
@@ -339,7 +339,7 @@ export function ReminderWorkspace({
               type="button"
               onClick={handleCreateReminder}
               disabled={isPending || title.trim().length < 3 || dueDate.length < 10}
-              className="primary-button mt-5 rounded-full px-6 py-3.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+              className="primary-button mt-5 rounded-lg px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isPending ? "Saving..." : "Create reminder"}
             </button>
@@ -348,7 +348,7 @@ export function ReminderWorkspace({
       </div>
 
       {variant === "dashboard" && board.nextReminder ? (
-        <div className="soft-card rounded-[1.5rem] p-5">
+        <div className="soft-card rounded-[1rem] p-4 sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -361,7 +361,7 @@ export function ReminderWorkspace({
             </div>
             <Link
               href="/reminders"
-              className="secondary-button rounded-full px-4 py-2 text-sm font-semibold"
+              className="secondary-button rounded-lg px-4 py-2 text-sm font-semibold"
             >
               Open reminders
             </Link>
@@ -369,7 +369,7 @@ export function ReminderWorkspace({
         </div>
       ) : null}
 
-      <div className="soft-card rounded-[1.6rem] p-5 sm:p-6">
+      <div className="soft-card rounded-[1rem] p-4 sm:p-5">
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
@@ -405,15 +405,15 @@ export function ReminderWorkspace({
               visibleActiveReminders.map((item) => (
                 <div
                   key={item.id}
-                  className={`rounded-[1.3rem] border px-4 py-4 ${reminderTone(item)}`}
+                  className={`rounded-[0.9rem] border px-4 py-4 ${reminderTone(item)}`}
                 >
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        <span className="rounded-full bg-white px-3 py-1">
+                        <span className="rounded-lg bg-white px-3 py-1">
                           {reminderStatusCopy(item)}
                         </span>
-                        <span className="rounded-full bg-white px-3 py-1">
+                        <span className="rounded-lg bg-white px-3 py-1">
                           {formatReminderDate(item.effectiveDueAt, timezone)}
                         </span>
                       </div>
@@ -439,13 +439,13 @@ export function ReminderWorkspace({
                             [item.id]: event.target.value,
                           }))
                         }
-                        className="field min-w-28 !rounded-full !px-4 !py-2 text-xs font-semibold"
+                        className="field min-w-28 !rounded-lg !px-4 !py-2 text-xs font-semibold"
                       />
                       <button
                         type="button"
                         onClick={() => handleReminderAction(item.id, "snooze")}
                         disabled={isPending}
-                        className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 disabled:opacity-60"
+                        className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 disabled:opacity-60"
                       >
                         Snooze
                       </button>
@@ -453,7 +453,7 @@ export function ReminderWorkspace({
                         type="button"
                         onClick={() => handleReminderAction(item.id, "done")}
                         disabled={isPending}
-                        className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 disabled:opacity-60"
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 disabled:opacity-60"
                       >
                         Done
                       </button>
@@ -461,7 +461,7 @@ export function ReminderWorkspace({
                         type="button"
                         onClick={() => handleReminderAction(item.id, "cancel")}
                         disabled={isPending}
-                        className="secondary-button rounded-full px-4 py-2 text-xs font-semibold disabled:opacity-60"
+                        className="secondary-button rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-60"
                       >
                         Cancel
                       </button>
@@ -481,13 +481,13 @@ export function ReminderWorkspace({
               visibleClosedReminders.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-[1.3rem] border border-white/70 bg-white/75 px-4 py-4"
+                  className="rounded-[0.9rem] border border-slate-200 bg-white px-4 py-4"
                 >
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    <span className="rounded-full bg-slate-100 px-3 py-1">
+                    <span className="rounded-lg bg-slate-100 px-3 py-1">
                       {reminderStatusCopy(item)}
                     </span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1">
+                    <span className="rounded-lg bg-slate-100 px-3 py-1">
                       {formatReminderDate(item.updatedAt, timezone)}
                     </span>
                   </div>
