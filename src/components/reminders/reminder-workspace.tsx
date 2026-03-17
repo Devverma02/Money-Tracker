@@ -3,11 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { useBrowserVoice } from "@/hooks/use-browser-voice";
+import type { ReminderParseResult } from "@/lib/reminders/reminder-parse-contract";
 import type {
   CreateReminderResponse,
   ReminderMutationResponse,
 } from "@/lib/reminders/reminder-contract";
 import type { ReminderBoard, ReminderItem } from "@/lib/reminders/types";
+
+const reminderSamples = [
+  "Kal shaam 6 baje Raju ko loan follow up yaad dilana",
+  "Next Monday electricity bill bharna yaad dilana",
+  "Parso subah mummy ko 5000 dene ka reminder lagao",
+];
 
 type ReminderWorkspaceProps = {
   board: ReminderBoard;
@@ -89,7 +97,13 @@ export function ReminderWorkspace({
   const [snoozeMap, setSnoozeMap] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [naturalInput, setNaturalInput] = useState("");
+  const [parsedReminder, setParsedReminder] = useState<ReminderParseResult | null>(null);
+  const [naturalError, setNaturalError] = useState<string | null>(null);
+  const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isParsingNatural, startParseTransition] = useTransition();
+  const [isSavingNatural, startNaturalSaveTransition] = useTransition();
   const [showCreateForm, setShowCreateForm] = useState(variant !== "dashboard");
   const [activeTab, setActiveTab] = useState<"active" | "closed">("active");
 
@@ -107,6 +121,93 @@ export function ReminderWorkspace({
         : board.closedReminders,
     [board.closedReminders, variant],
   );
+
+  const buildVoiceReply = (result: ReminderParseResult) => {
+    if (!result.draft) {
+      return (
+        result.clarificationQuestion ??
+        "I found the reminder intent, but I still need one more detail."
+      );
+    }
+
+    if (result.draft.assumedTime) {
+      return `I prepared the reminder for ${result.draft.dueLabel}. Please review before saving.`;
+    }
+
+    return `I prepared the reminder for ${result.draft.dueLabel}. Please review and confirm.`;
+  };
+
+  const runNaturalParse = (inputText: string, source: "text" | "voice") => {
+    startParseTransition(async () => {
+      setNaturalError(null);
+      setVoiceMessage(null);
+      setParsedReminder(null);
+
+      try {
+        const response = await fetch("/api/reminders/parse", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            inputText,
+            timezone,
+            bucket: defaultBucket,
+          }),
+        });
+
+        const payload = (await response.json()) as ReminderParseResult | { error?: string };
+
+        if (!response.ok) {
+          throw new Error(
+            "error" in payload && payload.error
+              ? payload.error
+              : "The reminder could not be understood.",
+          );
+        }
+
+        if (!("summaryText" in payload)) {
+          throw new Error("The reminder parse response was invalid.");
+        }
+
+        setParsedReminder(payload);
+
+        if (source === "voice") {
+          const reply = buildVoiceReply(payload);
+          setVoiceMessage(reply);
+          speakText(reply, "en-IN");
+        }
+      } catch (caughtError) {
+        setNaturalError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The reminder could not be understood.",
+        );
+
+        if (source === "voice") {
+          const reply = "I could not prepare the reminder clearly. Please try again.";
+          setVoiceMessage(reply);
+          speakText(reply, "en-IN");
+        }
+      }
+    });
+  };
+
+  const {
+    isSupported: isVoiceSupported,
+    isListening,
+    liveTranscript,
+    error: voiceError,
+    startListening,
+    stopListening,
+    speakText,
+  } = useBrowserVoice({
+    locale: "hi-IN",
+    onFinalTranscript: async (transcript) => {
+      setNaturalInput(transcript);
+      runNaturalParse(transcript, "voice");
+    },
+  });
 
   const handleCreateReminder = () => {
     startTransition(async () => {
@@ -148,6 +249,64 @@ export function ReminderWorkspace({
         setDueDate(buildLocalDate());
         setDueTime("");
         setSuccess(payload.message);
+        router.refresh();
+      } catch (caughtError) {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The reminder could not be saved.",
+        );
+      }
+    });
+  };
+
+  const handleSaveParsedReminder = () => {
+    const draft = parsedReminder?.draft;
+
+    if (!draft) {
+      return;
+    }
+
+    startNaturalSaveTransition(async () => {
+      setError(null);
+      setSuccess(null);
+      setNaturalError(null);
+
+      try {
+        const response = await fetch("/api/reminders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: draft.title,
+            linkedPerson: draft.linkedPerson ?? undefined,
+            dueAt: draft.dueAt,
+            bucket: draft.bucket,
+          }),
+        });
+
+        const payload = (await response.json()) as
+          | CreateReminderResponse
+          | { error?: string };
+
+        if (!response.ok) {
+          throw new Error(
+            "error" in payload && payload.error
+              ? payload.error
+              : "The reminder could not be saved.",
+          );
+        }
+
+        if (!("message" in payload)) {
+          throw new Error("The reminder response was invalid.");
+        }
+
+        setNaturalInput("");
+        setParsedReminder(null);
+        setVoiceMessage(null);
+        setSuccess(payload.message);
+        speakText("Reminder saved successfully.", "en-IN");
         router.refresh();
       } catch (caughtError) {
         setError(
@@ -286,9 +445,194 @@ export function ReminderWorkspace({
 
         {showCreateForm ? (
           <div className="soft-card mt-4 rounded-[1rem] p-5 sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Create reminder
-            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Create reminder
+                </p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  Speak or type naturally, review the preview, then confirm to save.
+                </p>
+              </div>
+              <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Bucket: {defaultBucket}
+              </span>
+            </div>
+
+            <div className="mt-5 rounded-[0.95rem] border border-slate-200 bg-white p-4">
+              <p className="text-sm font-semibold text-slate-900">Natural reminder</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Example: Kal shaam 6 baje Raju ko payment follow up yaad dilana.
+              </p>
+
+              <textarea
+                value={naturalInput}
+                onChange={(event) => setNaturalInput(event.target.value)}
+                placeholder="Type or speak a reminder naturally"
+                className="field mt-4 min-h-28 resize-none"
+              />
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {reminderSamples.map((sample) => (
+                  <button
+                    key={sample}
+                    type="button"
+                    onClick={() => setNaturalInput(sample)}
+                    className="secondary-button rounded-full px-4 py-2 text-xs font-semibold"
+                  >
+                    {sample}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Voice input</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Mic se bolo, app reminder preview bana degi.
+                  </p>
+                </div>
+                {isVoiceSupported ? (
+                  <button
+                    type="button"
+                    onClick={isListening ? stopListening : startListening}
+                    disabled={isPending || isParsingNatural || isSavingNatural}
+                    className={`rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
+                      isListening ? "bg-emerald-700" : "primary-button"
+                    }`}
+                  >
+                    {isListening ? "Stop mic" : "Start mic"}
+                  </button>
+                ) : (
+                  <span className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Browser mic not supported
+                  </span>
+                )}
+              </div>
+
+              {isListening || liveTranscript ? (
+                <div className="mt-4 rounded-[0.95rem] bg-slate-950 px-4 py-4 text-sm leading-7 text-slate-100">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                    {isListening ? "Listening live" : "Captured transcript"}
+                  </p>
+                  <p className="mt-2">{liveTranscript || "Start speaking..."}</p>
+                </div>
+              ) : null}
+
+              {voiceError ? (
+                <p className="status-danger mt-4 rounded-2xl border px-4 py-3 text-sm">
+                  {voiceError}
+                </p>
+              ) : null}
+
+              {voiceMessage ? (
+                <p className="status-positive mt-4 rounded-2xl border px-4 py-3 text-sm">
+                  {voiceMessage}
+                </p>
+              ) : null}
+
+              {naturalError ? (
+                <p className="status-danger mt-4 rounded-2xl border px-4 py-3 text-sm">
+                  {naturalError}
+                </p>
+              ) : null}
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => runNaturalParse(naturalInput, "text")}
+                  disabled={
+                    isPending ||
+                    isParsingNatural ||
+                    isSavingNatural ||
+                    naturalInput.trim().length < 3
+                  }
+                  className="primary-button rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isParsingNatural ? "Preparing..." : "Generate preview"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveParsedReminder}
+                  disabled={
+                    isPending ||
+                    isParsingNatural ||
+                    isSavingNatural ||
+                    !parsedReminder?.draft
+                  }
+                  className="secondary-button rounded-lg px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingNatural ? "Saving..." : "Confirm reminder"}
+                </button>
+              </div>
+
+              {parsedReminder ? (
+                <div className="mt-4 rounded-[0.95rem] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <span className="rounded-lg bg-white px-3 py-1">
+                      {parsedReminder.parserMode}
+                    </span>
+                    <span className="rounded-lg bg-white px-3 py-1">
+                      {Math.round(parsedReminder.confidence * 100)}% confidence
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">
+                    {parsedReminder.summaryText}
+                  </p>
+
+                  {parsedReminder.draft ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[0.85rem] bg-white px-4 py-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Reminder title
+                        </p>
+                        <p className="mt-2 font-semibold text-slate-950">
+                          {parsedReminder.draft.title}
+                        </p>
+                      </div>
+                      <div className="rounded-[0.85rem] bg-white px-4 py-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Due
+                        </p>
+                        <p className="mt-2 font-semibold text-slate-950">
+                          {parsedReminder.draft.dueLabel}
+                        </p>
+                      </div>
+                      <div className="rounded-[0.85rem] bg-white px-4 py-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Linked person
+                        </p>
+                        <p className="mt-2 font-semibold text-slate-950">
+                          {parsedReminder.draft.linkedPerson ?? "General reminder"}
+                        </p>
+                      </div>
+                      <div className="rounded-[0.85rem] bg-white px-4 py-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Save rule
+                        </p>
+                        <p className="mt-2 font-semibold text-slate-950">
+                          {parsedReminder.draft.assumedTime
+                            ? "9:00 am assumed"
+                            : "Exact time captured"}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="status-warn mt-4 rounded-2xl border px-4 py-3 text-sm">
+                      {parsedReminder.clarificationQuestion ??
+                        "One more detail is needed before the reminder can be saved."}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-6 border-t border-slate-200 pt-5">
+              <p className="text-sm font-semibold text-slate-900">Or fill manually</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                Use the classic form if you want to set each field yourself.
+              </p>
+            </div>
 
             <label className="mt-4 block text-sm font-semibold text-slate-700">
               Reminder title
@@ -338,7 +682,13 @@ export function ReminderWorkspace({
             <button
               type="button"
               onClick={handleCreateReminder}
-              disabled={isPending || title.trim().length < 3 || dueDate.length < 10}
+              disabled={
+                isPending ||
+                isParsingNatural ||
+                isSavingNatural ||
+                title.trim().length < 3 ||
+                dueDate.length < 10
+              }
               className="primary-button mt-5 rounded-lg px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isPending ? "Saving..." : "Create reminder"}
