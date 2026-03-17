@@ -31,15 +31,19 @@ export async function PublicHeader() {
               <Link href="/" className="nav-link rounded-lg px-3 py-2">
                 Home
               </Link>
-              <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
-                Dashboard
-              </Link>
-              <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
-                Reminders
-              </Link>
-              <Link href="/history" className="nav-link rounded-lg px-3 py-2">
-                History
-              </Link>
+              {user ? (
+                <>
+                  <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
+                    Dashboard
+                  </Link>
+                  <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
+                    Reminders
+                  </Link>
+                  <Link href="/history" className="nav-link rounded-lg px-3 py-2">
+                    History
+                  </Link>
+                </>
+              ) : null}
             </nav>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -53,7 +57,7 @@ export async function PublicHeader() {
               ) : (
                 <Link
                   href="/login"
-                  className="primary-button rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
+                  className="primary-button rounded-lg px-4 py-2.5 text-sm font-semibold !text-white"
                 >
                   Sign in
                 </Link>
@@ -70,15 +74,19 @@ export async function PublicHeader() {
                 <Link href="/" className="nav-link rounded-lg px-3 py-2">
                   Home
                 </Link>
-                <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
-                  Dashboard
-                </Link>
-                <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
-                  Reminders
-                </Link>
-                <Link href="/history" className="nav-link rounded-lg px-3 py-2">
-                  History
-                </Link>
+                {user ? (
+                  <>
+                    <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
+                      Dashboard
+                    </Link>
+                    <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
+                      Reminders
+                    </Link>
+                    <Link href="/history" className="nav-link rounded-lg px-3 py-2">
+                      History
+                    </Link>
+                  </>
+                ) : null}
               </nav>
 
               <div className="mt-3 border-t border-slate-200 pt-3">
@@ -92,7 +100,7 @@ export async function PublicHeader() {
                 ) : (
                   <Link
                     href="/login"
-                    className="primary-button inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white"
+                    className="primary-button inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold !text-white"
                   >
                     Sign in
                   </Link>

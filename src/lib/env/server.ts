@@ -19,11 +19,11 @@ function normalizeRuntimeDatabaseUrl(rawUrl: string) {
 const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1),
-  DIRECT_URL: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-  OPENAI_API_KEY: z.string().min(1),
-  OPENAI_MODEL: z.string().min(1),
-  STT_PROVIDER: z.string().min(1),
+  DIRECT_URL: z.string().optional().default(""),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().default(""),
+  OPENAI_API_KEY: z.string().optional().default(""),
+  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  STT_PROVIDER: z.string().default("openai"),
 });
 
 export const serverEnv = serverEnvSchema.parse({
