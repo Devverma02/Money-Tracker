@@ -148,6 +148,18 @@ function formatDateInTimezone(timezone: string, offsetDays = 0) {
   }).format(date);
 }
 
+function hasFutureTenseSignal(text: string) {
+  return /\b(aayega|aayegi|aayenge|aaega|aaegi|aaenge|milega|milega|milege|milenge|denge|dega|degi|hoga|hogi|honge|will|tomorrow|next)\b/i.test(
+    text,
+  );
+}
+
+function hasPastTenseSignal(text: string) {
+  return /\b(aya|aaya|ayi|aayi|mila|mili|diya|gaya|gayi|hua|hui|yesterday|last|ago)\b/i.test(
+    text,
+  );
+}
+
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -157,7 +169,7 @@ function normalizeSourceText(text: string) {
     text
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'")
-      .replace(/rs\.?/gi, "rs ")
+      .replace(/\brs\.?\b/gi, "rs ")
       .replace(/₹/g, " rs ")
       .replace(/\bkharcha\b/gi, "expense")
       .replace(/\baamdani\b/gi, "income")
@@ -173,7 +185,32 @@ function normalizeSourceText(text: string) {
 }
 
 function detectAmount(text: string) {
-  const amountMatch = text.match(
+  const normalizedAmountText = text.replace(/\u20B9/g, " rs ");
+  const preciseAmountMatch = normalizedAmountText.match(
+    /(?:\brs\.?\b|rupees?|rupaye?)?\s*(\d+(?:,\d{3})*(?:\.\d+)?)(?:\s*(k|thousand|lakh|lac|lakhs))?/i,
+  );
+
+  if (preciseAmountMatch) {
+    const rawAmount = Number(preciseAmountMatch[1].replaceAll(",", ""));
+
+    if (!Number.isFinite(rawAmount)) {
+      return null;
+    }
+
+    const suffix = preciseAmountMatch[2]?.toLowerCase();
+
+    if (suffix === "k" || suffix === "thousand") {
+      return rawAmount * 1000;
+    }
+
+    if (suffix === "lakh" || suffix === "lac" || suffix === "lakhs") {
+      return rawAmount * 100000;
+    }
+
+    return rawAmount;
+  }
+  const normalizedText = text.replace(/â‚¹/g, " rs ");
+  const amountMatch = normalizedText.match(
     /(?:rs\.?|₹|rupaye?|rupees?)?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s*(k|thousand|lakh|lac|lakhs))?/i,
   );
 
@@ -348,6 +385,8 @@ function detectDate(
   fallbackDate?: Pick<DetectedDate, "dateText" | "resolvedDate"> | null,
 ): DetectedDate {
   const cleanText = text.toLowerCase();
+  const hasFutureSignal = hasFutureTenseSignal(cleanText);
+  const hasPastSignal = hasPastTenseSignal(cleanText);
   const local = getLocalDateParts(new Date(), timezone);
 
   const ddmmyyyyMatch = cleanText.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
@@ -410,7 +449,7 @@ function detectDate(
   if (/\b(parso|day before yesterday)\b/.test(cleanText)) {
     return {
       dateText: "parso",
-      resolvedDate: formatDateInTimezone(timezone, -2),
+      resolvedDate: formatDateInTimezone(timezone, hasFutureSignal && !hasPastSignal ? 2 : -2),
       hasExplicitDate: true,
     };
   }
@@ -418,7 +457,7 @@ function detectDate(
   if (/\b(kal|yesterday)\b/.test(cleanText)) {
     return {
       dateText: "kal",
-      resolvedDate: formatDateInTimezone(timezone, -1),
+      resolvedDate: formatDateInTimezone(timezone, hasFutureSignal && !hasPastSignal ? 1 : -1),
       hasExplicitDate: true,
     };
   }

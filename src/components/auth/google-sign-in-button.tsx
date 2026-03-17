@@ -37,9 +37,9 @@ export function GoogleSignInButton() {
         {isPending ? "Signing you in..." : "Continue with Google"}
       </button>
       {error ? (
-        <p className="text-sm text-red-700">{error}</p>
+        <p className="text-sm text-red-600">{error}</p>
       ) : (
-        <p className="text-xs leading-6 text-slate-500">
+        <p className="text-xs leading-6 text-gray-400">
           After sign-in, you will land directly inside the protected dashboard.
         </p>
       )}

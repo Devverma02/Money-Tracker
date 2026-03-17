@@ -20,6 +20,7 @@ export async function POST(request: Request) {
       userId: user.id,
       question: payload.question,
       timeZone: payload.timezone,
+      conversation: payload.conversation,
     });
 
     return NextResponse.json(result);

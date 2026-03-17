@@ -6,6 +6,7 @@ import { RealtimeVoicePanel } from "@/components/entry/realtime-voice-panel";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ParseResult, ParsedAction } from "@/lib/ai/parse-contract";
 import type { SaveEntryResponse } from "@/lib/ledger/save-contract";
+import { getVoiceReplyContext, voiceText, type VoiceReplyContext } from "@/lib/voice/voice-localization";
 
 const sampleInputs = [
   "Spent 480 on groceries today",
@@ -82,6 +83,12 @@ export function TextEntryWorkspace({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
+  const [voiceReplyContext, setVoiceReplyContext] = useState<VoiceReplyContext>({
+    mode: "english",
+    speechLang: "en-IN",
+  });
+  const [awaitingVoiceClarification, setAwaitingVoiceClarification] = useState(false);
+  const [voiceConversationText, setVoiceConversationText] = useState("");
   const [lastInputMode, setLastInputMode] = useState<"text" | "voice" | null>(null);
   const [isParsing, startParseTransition] = useTransition();
   const [isSaving, startSaveTransition] = useTransition();
@@ -100,49 +107,180 @@ export function TextEntryWorkspace({
   const blockedCount = result ? result.actions.length - readyCount : 0;
   const canSave = selectedActions.length > 0 && !isParsing && !isSaving;
 
-  const buildVoiceReply = (parseResult: ParseResult) => {
+  const buildVoiceReply = (parseResult: ParseResult, context: VoiceReplyContext) => {
     const readyItems = parseResult.actions.filter(isActionReady).length;
     const blockedItems = parseResult.actions.length - readyItems;
 
     if (parseResult.actions.length === 0) {
-      return "I heard you. Please try again with a money update.";
+      return voiceText(context, {
+        english: "I heard you. Please try again with a money update.",
+        hinglish: "Maine suna. Ek baar fir se money update boliye.",
+        hindi: "मैंने सुना। कृपया पैसे की बात फिर से बोलिए।",
+      });
     }
 
     if (blockedItems > 0 && readyItems === 0) {
-      return (
-        parseResult.clarificationQuestion ??
-        "I found the update, but it still needs one more detail before saving."
-      );
+      return parseResult.clarificationQuestion
+        ? parseResult.clarificationQuestion
+        : voiceText(context, {
+            english: "I found the update, but it still needs one more detail before saving.",
+            hinglish: "Update mil gaya hai, lekin save se pehle ek aur detail chahiye.",
+            hindi: "अपडेट मिल गया है, लेकिन सेव करने से पहले एक और जानकारी चाहिए।",
+          });
     }
 
     if (parseResult.actions.length === 1) {
       const firstAction = parseResult.actions[0];
-      const actionLabelMap: Record<string, string> = {
-        expense: "an expense",
-        income: "an income entry",
-        loan_given: "a loan given",
-        loan_taken: "a borrowed amount",
-        loan_received_back: "a loan received back",
-        loan_repaid: "a loan repayment",
-        savings_deposit: "a savings deposit",
-        note: "a note",
+      const actionLabelMap: Record<
+        NonNullable<ParsedAction["entryType"]>,
+        { english: string; hinglish: string; hindi: string }
+      > = {
+        expense: {
+          english: "an expense",
+          hinglish: "ek expense",
+          hindi: "एक खर्च",
+        },
+        income: {
+          english: "an income entry",
+          hinglish: "ek income entry",
+          hindi: "एक आमदनी एंट्री",
+        },
+        loan_given: {
+          english: "a loan given",
+          hinglish: "diya hua loan",
+          hindi: "दिया हुआ उधार",
+        },
+        loan_taken: {
+          english: "a borrowed amount",
+          hinglish: "liya hua loan",
+          hindi: "लिया हुआ उधार",
+        },
+        loan_received_back: {
+          english: "a loan received back",
+          hinglish: "wapas mila loan",
+          hindi: "वापस मिला उधार",
+        },
+        loan_repaid: {
+          english: "a loan repayment",
+          hinglish: "loan repayment",
+          hindi: "उधार की वापसी",
+        },
+        savings_deposit: {
+          english: "a savings deposit",
+          hinglish: "savings deposit",
+          hindi: "बचत जमा",
+        },
+        note: {
+          english: "a note",
+          hinglish: "ek note",
+          hindi: "एक नोट",
+        },
       };
       const actionLabel = firstAction?.entryType
-        ? actionLabelMap[firstAction.entryType]
-        : "an entry";
+        ? voiceText(context, actionLabelMap[firstAction.entryType])
+        : voiceText(context, {
+            english: "an entry",
+            hinglish: "ek entry",
+            hindi: "एक एंट्री",
+          });
       const amountText =
         firstAction?.amount !== null && firstAction?.amount !== undefined
-          ? ` for rupees ${firstAction.amount}`
+          ? voiceText(context, {
+              english: ` for rupees ${firstAction.amount}`,
+              hinglish: ` ${firstAction.amount} rupaye ki`,
+              hindi: ` ${firstAction.amount} रुपये की`,
+            })
           : "";
 
-      return `I heard ${actionLabel}${amountText}. Please review and confirm to save.`;
+      return voiceText(context, {
+        english: `I heard ${actionLabel}${amountText}. Please review and confirm to save.`,
+        hinglish: `Maine ${actionLabel}${amountText} entry suni hai. Save karne se pehle review karke confirm kijiye.`,
+        hindi: `मैंने ${actionLabel}${amountText} एंट्री सुनी है। सेव करने से पहले देखकर पुष्टि कीजिए।`,
+      });
     }
 
     if (blockedItems === 0) {
-      return `I found ${parseResult.actions.length} entries. They are ready for your review and save.`;
+      return voiceText(context, {
+        english: `I found ${parseResult.actions.length} entries. They are ready for your review and save.`,
+        hinglish: `Mujhe ${parseResult.actions.length} entries mili hain. Ye review aur save ke liye ready hain.`,
+        hindi: `मुझे ${parseResult.actions.length} एंट्रियाँ मिली हैं। ये देखने और सेव करने के लिए तैयार हैं।`,
+      });
     }
 
-    return `I found ${parseResult.actions.length} entries. ${readyItems} are ready, and ${blockedItems} still need clarification.`;
+    return voiceText(context, {
+      english: `I found ${parseResult.actions.length} entries. ${readyItems} are ready, and ${blockedItems} still need clarification.`,
+      hinglish: `Mujhe ${parseResult.actions.length} entries mili hain. ${readyItems} ready hain aur ${blockedItems} me abhi clarification chahiye.`,
+      hindi: `मुझे ${parseResult.actions.length} एंट्रियाँ मिली हैं। ${readyItems} तैयार हैं और ${blockedItems} में अभी और जानकारी चाहिए।`,
+    });
+  };
+
+  const localizeClarificationQuestion = (
+    clarificationQuestion: string | null,
+    context: VoiceReplyContext,
+  ) => {
+    const normalized = clarificationQuestion?.toLowerCase() ?? "";
+
+    if (!clarificationQuestion) {
+      return voiceText(context, {
+        english: "I need one more detail before I can prepare the entry.",
+        hinglish: "Entry taiyar karne ke liye mujhe ek aur detail chahiye.",
+        hindi: "Entry taiyar karne ke liye mujhe ek aur detail chahiye.",
+      });
+    }
+
+    if (/what is the amount/.test(normalized)) {
+      return voiceText(context, {
+        english: clarificationQuestion,
+        hinglish: "Amount clear nahi hua. Kitne rupaye the, dobara boliye.",
+        hindi: "Amount clear nahi hua. Kitne rupaye the, dobara boliye.",
+      });
+    }
+
+    if (/expense, income, or loan-related/.test(normalized)) {
+      return voiceText(context, {
+        english: clarificationQuestion,
+        hinglish: "Ye expense hai, income hai, ya loan wali entry hai? Bas itna bol dijiye.",
+        hindi: "Ye expense hai, income hai, ya loan wali entry hai? Bas itna bol dijiye.",
+      });
+    }
+
+    if (/which date should i use/.test(normalized)) {
+      return voiceText(context, {
+        english: clarificationQuestion,
+        hinglish: "Date clear nahi hui. Kaunsi date thi, fir se bol dijiye.",
+        hindi: "Date clear nahi hui. Kaunsi date thi, fir se bol dijiye.",
+      });
+    }
+
+    return clarificationQuestion;
+  };
+
+  const buildVoiceResponse = (parseResult: ParseResult, context: VoiceReplyContext) => {
+    const readyItems = parseResult.actions.filter(isActionReady).length;
+    const blockedItems = parseResult.actions.length - readyItems;
+
+    if (parseResult.actions.length === 0) {
+      return {
+        reply: voiceText(context, {
+          english: "I could not understand the full update. Please say the missing part once more.",
+          hinglish: "Main poori baat samajh nahi paya. Jo part reh gaya hai, wo fir se bol dijiye.",
+          hindi: "Main poori baat samajh nahi paya. Jo part reh gaya hai, wo fir se bol dijiye.",
+        }),
+        shouldRelisten: true,
+      };
+    }
+
+    if (blockedItems > 0) {
+      return {
+        reply: localizeClarificationQuestion(parseResult.clarificationQuestion, context),
+        shouldRelisten: true,
+      };
+    }
+
+    return {
+      reply: buildVoiceReply(parseResult, context),
+      shouldRelisten: false,
+    };
   };
 
   const runParse = (nextInputText: string, source: "text" | "voice") => {
@@ -174,18 +312,34 @@ export function TextEntryWorkspace({
         setResult(payload);
 
         if (source === "voice") {
-          const reply = buildVoiceReply(payload);
-          setVoiceMessage(reply);
-          speakText(reply, "en-IN");
+          const context = getVoiceReplyContext(nextInputText);
+          setVoiceReplyContext(context);
+          const voiceResponse = buildVoiceResponse(payload, context);
+          setVoiceMessage(voiceResponse.reply);
+          setVoiceConversationText(nextInputText);
+          setAwaitingVoiceClarification(voiceResponse.shouldRelisten);
+          speakText(voiceResponse.reply, context.speechLang, () => {
+            if (voiceResponse.shouldRelisten) {
+              startListening();
+            }
+          });
         }
       } catch {
         setResult(null);
         setError("The parser is unavailable right now. Please try again.");
 
         if (source === "voice") {
-          const reply = "I could not catch that clearly. Please try speaking once more.";
+          const context = getVoiceReplyContext(nextInputText);
+          setVoiceReplyContext(context);
+          const reply = voiceText(context, {
+            english: "I could not catch that clearly. Please try speaking once more.",
+            hinglish: "Main isko clearly samajh nahi paya. Ek baar fir se boliye.",
+            hindi: "मैं इसे साफ़ समझ नहीं पाया। कृपया एक बार फिर बोलिए।",
+          });
           setVoiceMessage(reply);
-          speakText(reply, "en-IN");
+          speakText(reply, context.speechLang);
+          setVoiceConversationText(nextInputText);
+          setAwaitingVoiceClarification(false);
         }
       }
     });
@@ -202,8 +356,13 @@ export function TextEntryWorkspace({
   } = useNativeSpeech({
     locale: "hi-IN",
     onFinalTranscript: async (transcript) => {
-      setInputText(transcript);
-      runParse(transcript, "voice");
+      const combinedTranscript =
+        awaitingVoiceClarification && voiceConversationText.trim().length > 0
+          ? `${voiceConversationText.trim()} ${transcript.trim()}`.trim()
+          : transcript;
+
+      setInputText(combinedTranscript);
+      runParse(combinedTranscript, "voice");
     },
   });
 
@@ -265,10 +424,25 @@ export function TextEntryWorkspace({
 
         if (lastInputMode === "voice") {
           speakText(
-            payload.savedCount === 1 ? "Saved successfully." : "Entries saved successfully.",
-            "en-IN",
+            voiceText(voiceReplyContext, {
+              english:
+                payload.savedCount === 1
+                  ? "Saved successfully."
+                  : "Entries saved successfully.",
+              hinglish:
+                payload.savedCount === 1
+                  ? "Entry successfully save ho gayi."
+                  : "Entries successfully save ho gayi hain.",
+              hindi:
+                payload.savedCount === 1
+                  ? "एंट्री सफलतापूर्वक सेव हो गई।"
+                  : "एंट्रियाँ सफलतापूर्वक सेव हो गई हैं।",
+            }),
+            voiceReplyContext.speechLang,
           );
         }
+        setAwaitingVoiceClarification(false);
+        setVoiceConversationText("");
 
         const remainingActions = result.actions.filter(
           (_, index) => !selectedReadyIndexes.includes(index),
@@ -277,6 +451,8 @@ export function TextEntryWorkspace({
         if (remainingActions.length === 0) {
           setInputText("");
           setResult(null);
+          setAwaitingVoiceClarification(false);
+          setVoiceConversationText("");
           return;
         }
 
@@ -302,106 +478,97 @@ export function TextEntryWorkspace({
       : `Save selected (${selectedActions.length})`;
 
   return (
-    <section className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
-      <div className="shell-card rounded-[1rem] p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <section className="grid gap-3 xl:grid-cols-[1.08fr_0.92fr]">
+      {/* ── Input panel ── */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="eyebrow text-brand">Quick entry</p>
-            <h2 className="mt-3 font-mono text-3xl font-semibold text-slate-950 sm:text-4xl">
-              Add money updates
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Write or speak naturally. The app will split multiple updates into separate
-              previews before anything is saved.
+            <h2 className="text-xl font-bold text-gray-900">Add money updates</h2>
+            <p className="mt-0.5 text-sm text-gray-500">
+              Write or speak naturally. Multiple updates split into separate previews.
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600">
+          <span className="inline-flex rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-400">
             Bucket: {defaultBucket}
-          </div>
+          </span>
         </div>
 
-        <label className="mt-6 block text-sm font-semibold text-slate-700">
+        <label className="mt-4 block text-sm font-medium text-gray-600">
           Money update
         </label>
         <textarea
           value={inputText}
           onChange={(event) => setInputText(event.target.value)}
-          placeholder="Example: Aaj 480 groceries aur 200 petrol, kal Raju ko 1000 udhaar diya"
-          className="field mt-3 min-h-36 resize-none"
+          placeholder="e.g. Aaj 480 groceries aur 200 petrol, kal Raju ko 1000 udhaar diya"
+          className="field mt-1.5 min-h-28 resize-none rounded-lg"
         />
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {sampleInputs.map((sample) => (
             <button
               key={sample}
               type="button"
               onClick={() => setInputText(sample)}
-              className="secondary-button rounded-full px-4 py-2 text-xs font-semibold"
+              className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] text-gray-500 transition-colors hover:border-teal-200 hover:bg-teal-50 hover:text-[#0d9488]"
             >
               {sample}
             </button>
           ))}
         </div>
 
-        <details className="mt-4 rounded-[0.9rem] border border-slate-200 bg-white p-4">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
-            Show voice options
+        {/* Voice options — collapsible */}
+        <details className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3">
+          <summary className="cursor-pointer list-none text-sm font-medium text-gray-900">
+            🎤 Voice options
           </summary>
 
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Voice capture</p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                Speak naturally. Multiple money updates will be split into separate
-                previews.
-              </p>
-            </div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-gray-400">
+              Speak naturally. Multiple money updates will be split into previews.
+            </p>
             {isVoiceSupported ? (
               <button
                 type="button"
                 onClick={isListening ? stopListening : startListening}
                 disabled={isParsing || isSaving}
-                className={`rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
-                  isListening ? "bg-emerald-700" : "primary-button"
+                className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
+                  isListening ? "bg-red-500" : "primary-button"
                 }`}
               >
-                {isListening ? "Stop mic" : "Start mic"}
+                {isListening ? "⏹ Stop mic" : "🎙 Start mic"}
               </button>
             ) : (
-              <span className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <span className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-400">
                 Browser mic not supported
               </span>
             )}
           </div>
 
           {isListening || liveTranscript ? (
-            <div className="mt-4 rounded-[1.2rem] bg-slate-950 px-4 py-4 text-sm leading-7 text-slate-100">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
-                {isListening ? "Listening live" : "Captured transcript"}
+            <div className="mt-3 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-gray-700">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#0d9488]">
+                {isListening ? "● Listening..." : "Captured transcript"}
               </p>
-              <p className="mt-2">{liveTranscript || "Start speaking..."}</p>
+              <p className="mt-1">{liveTranscript || "Start speaking..."}</p>
             </div>
           ) : null}
 
           {voiceError ? (
-            <p className="status-danger mt-4 rounded-2xl border px-4 py-3 text-sm">
-              {voiceError}
-            </p>
+            <p className="status-danger mt-3 rounded-lg border px-3 py-2 text-sm">{voiceError}</p>
           ) : null}
 
           {voiceMessage ? (
-            <p className="status-positive mt-4 rounded-2xl border px-4 py-3 text-sm">
-              {voiceMessage}
-            </p>
+            <p className="status-positive mt-3 rounded-lg border px-3 py-2 text-sm">{voiceMessage}</p>
           ) : null}
         </details>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        {/* Action buttons */}
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
             onClick={handleParse}
             disabled={isParsing || isSaving || inputText.trim().length < 2}
-            className="primary-button rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+            className="primary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isParsing ? "Reviewing..." : "Generate preview"}
           </button>
@@ -409,111 +576,90 @@ export function TextEntryWorkspace({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="secondary-button rounded-lg px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+            className="secondary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving ? "Saving..." : saveButtonLabel}
           </button>
         </div>
 
         {error ? (
-          <p className="status-danger mt-4 rounded-2xl border px-4 py-3 text-sm">
-            {error}
-          </p>
+          <p className="status-danger mt-3 rounded-lg border px-3 py-2 text-sm">{error}</p>
         ) : null}
 
         {saveMessage ? (
-          <p className="status-positive mt-4 rounded-2xl border px-4 py-3 text-sm">
-            {saveMessage}
-          </p>
+          <p className="status-positive mt-3 rounded-lg border px-3 py-2 text-sm">{saveMessage}</p>
         ) : null}
 
         {duplicateMessage ? (
-          <p className="status-warn mt-4 rounded-2xl border px-4 py-3 text-sm">
-            {duplicateMessage}
-          </p>
+          <p className="status-warn mt-3 rounded-lg border px-3 py-2 text-sm">{duplicateMessage}</p>
         ) : null}
       </div>
 
-      <div className="grid gap-4">
-        <div className="soft-card rounded-[1rem] p-4 sm:p-5">
+      {/* ── Preview panel ── */}
+      <div className="space-y-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="eyebrow text-brand">Preview</p>
+            <h3 className="text-sm font-semibold text-gray-900">Preview</h3>
             {result ? (
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                <span className="rounded-lg bg-brand-soft px-3 py-1 text-brand">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="rounded-md bg-teal-50 px-2 py-0.5 text-[11px] font-medium text-[#0d9488]">
                   {result.parserMode}
                 </span>
-                <span className="rounded-lg bg-white px-3 py-1">
-                  {Math.round(result.confidence * 100)}% confidence
+                <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                  {Math.round(result.confidence * 100)}%
                 </span>
               </div>
             ) : null}
           </div>
 
           {!result ? (
-            <div className="mt-4 rounded-[0.95rem] border border-dashed border-slate-300/80 bg-white px-5 py-7 text-sm leading-7 text-slate-500">
-              No preview yet. Enter one or more money updates and review each parsed
-              item here.
+            <div className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-400">
+              No preview yet. Enter money updates and click &quot;Generate preview&quot;.
             </div>
           ) : (
-            <div className="mt-4 space-y-4">
-              <p className="text-sm leading-7 text-slate-600">{result.summaryText}</p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[0.85rem] bg-white px-4 py-4 text-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Total found
-                  </p>
-                  <p className="mt-2 font-mono text-2xl font-semibold text-slate-950">
-                    {result.actions.length}
-                  </p>
-                </div>
-                <div className="rounded-[0.85rem] bg-white px-4 py-4 text-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Ready now
-                  </p>
-                  <p className="mt-2 font-mono text-2xl font-semibold text-emerald-700">
-                    {readyCount}
-                  </p>
-                </div>
-                <div className="rounded-[0.85rem] bg-white px-4 py-4 text-sm">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Selected
-                  </p>
-                  <p className="mt-2 font-mono text-2xl font-semibold text-slate-950">
-                    {selectedActions.length}
-                  </p>
-                </div>
+            <div className="mt-3 space-y-3">
+              {/* Inline summary replacing 3 stat cards */}
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-md bg-gray-100 px-2 py-0.5 font-medium text-gray-900">
+                  {result.actions.length} found
+                </span>
+                <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                  {readyCount} ready
+                </span>
+                <span className="rounded-md bg-teal-50 px-2 py-0.5 font-medium text-[#0d9488]">
+                  {selectedActions.length} selected
+                </span>
               </div>
 
               {blockedCount > 0 ? (
-                <div className="status-warn rounded-[1.4rem] border px-4 py-4 text-sm">
-                  <p className="font-semibold">Some items still need clarification</p>
-                  <p className="mt-2">
+                <div className="status-warn rounded-lg border px-3 py-2 text-sm">
+                  <p className="font-medium">Some items need clarification</p>
+                  <p className="mt-0.5 text-xs">
                     {result.clarificationQuestion ??
-                      "Only the ready items can be selected and saved right now."}
+                      "Only ready items can be selected and saved."}
                   </p>
                 </div>
               ) : (
-                <div className="status-positive rounded-[1.4rem] border px-4 py-4 text-sm">
-                  All reviewed items are ready for confirmation.
+                <div className="status-positive rounded-lg border px-3 py-2 text-sm">
+                  All items are ready for confirmation.
                 </div>
               )}
 
               {readyCount > 1 ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
                     onClick={() => setSelectedIndexes(readyIndexes)}
-                    className="secondary-button rounded-lg px-4 py-2 text-xs font-semibold"
+                    className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
                   >
-                    Select all ready
+                    Select all
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedIndexes([])}
-                    className="secondary-button rounded-lg px-4 py-2 text-xs font-semibold"
+                    className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
                   >
-                    Clear selection
+                    Clear
                   </button>
                 </div>
               ) : null}
@@ -537,11 +683,11 @@ export function TextEntryWorkspace({
           );
         })}
 
-        <details className="soft-card rounded-[1rem] p-4 sm:p-5">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
-            Show live voice assistant
+        <details className="rounded-xl border border-gray-200 bg-white p-4">
+          <summary className="cursor-pointer list-none text-sm font-medium text-gray-900">
+            🔊 Live voice assistant
           </summary>
-          <div className="mt-5">
+          <div className="mt-3">
             <RealtimeVoicePanel />
           </div>
         </details>

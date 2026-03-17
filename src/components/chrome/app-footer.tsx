@@ -9,26 +9,28 @@ const footerLinks = [
 
 export function AppFooter() {
   return (
-    <footer className="mx-auto mt-8 w-full max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
-      <div className="shell-card rounded-[1rem] px-4 py-5 sm:px-5 sm:py-6">
-        <div className="grid gap-6 border-b border-slate-200 pb-5 md:grid-cols-[1.25fr_0.75fr]">
-          <div className="space-y-3">
-            <p className="eyebrow text-brand">MoneyManage</p>
-            <h2 className="font-mono text-2xl font-semibold text-slate-950">
-              Clear records. Calm money decisions.
-            </h2>
-            <p className="max-w-2xl text-sm leading-7 text-slate-600">
-              Built for review-first entry, grounded summaries, and simple daily tracking
-              that stays readable on every screen size.
+    <footer className="border-t border-gray-200">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+        <div className="grid gap-6 sm:grid-cols-[1.5fr_1fr] sm:items-start">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#0d9488] text-[10px] font-bold text-white">
+                MM
+              </span>
+              <span className="text-sm font-semibold text-gray-900">MoneyManage</span>
+            </div>
+            <p className="mt-3 max-w-sm text-sm leading-6 text-gray-500">
+              Review-first personal finance. Fast entry by text or voice,
+              grounded AI answers, and simple daily tracking.
             </p>
           </div>
 
-          <nav className="grid gap-2 text-sm font-semibold text-slate-700 sm:grid-cols-2">
+          <nav className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             {footerLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="nav-link rounded-lg px-3 py-2"
+                className="py-1 text-gray-500 transition-colors hover:text-gray-900"
               >
                 {link.label}
               </Link>
@@ -36,9 +38,9 @@ export function AppFooter() {
           </nav>
         </div>
 
-        <div className="flex flex-col gap-2 pt-4 text-xs uppercase tracking-[0.18em] text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <span>Trust-first finance workspace</span>
-          <span>Responsive, reviewable, and grounded in saved records</span>
+        <div className="mt-8 flex flex-col gap-2 border-t border-gray-100 pt-5 text-xs text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+          <span>© 2025 MoneyManage</span>
+          <span>Built for trust, speed, and clarity</span>
         </div>
       </div>
     </footer>

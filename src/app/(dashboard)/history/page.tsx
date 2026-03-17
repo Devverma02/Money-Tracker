@@ -2,7 +2,15 @@ import { HistoryWorkspace } from "@/components/history/history-workspace";
 import { getRecentEntries } from "@/lib/ledger/history";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function HistoryPage() {
+type HistoryPageProps = {
+  searchParams?: Promise<{
+    page?: string;
+    type?: string;
+    period?: string;
+  }>;
+};
+
+export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -12,7 +20,17 @@ export default async function HistoryPage() {
     return null;
   }
 
-  const entries = await getRecentEntries(user.id);
+  const params = (await searchParams) ?? {};
+  const historyPageData = await getRecentEntries(user.id, {
+    page: Number(params.page ?? "1"),
+    entryType: params.type ?? "",
+    period:
+      params.period === "today" ||
+      params.period === "week" ||
+      params.period === "month"
+        ? params.period
+        : "all",
+  });
 
-  return <HistoryWorkspace entries={entries} />;
+  return <HistoryWorkspace historyPageData={historyPageData} />;
 }

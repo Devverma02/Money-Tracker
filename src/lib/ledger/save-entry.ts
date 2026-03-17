@@ -2,6 +2,7 @@ import { Prisma, SourceMode } from "@prisma/client";
 import type { User } from "@supabase/supabase-js";
 import type { ParsedAction } from "@/lib/ai/parse-contract";
 import { createDuplicateFingerprintFromParsedAction } from "@/lib/ledger/duplicate-fingerprint";
+import { generateEntryNoteFromParsedAction } from "@/lib/ledger/entry-note";
 import { prisma } from "@/lib/prisma";
 import { toLedgerEntryType } from "@/lib/ledger/entry-types";
 
@@ -66,6 +67,7 @@ async function saveParsedActionWithTx(params: {
     validateParsedAction(action);
   const bucketId = await ensureBucketId(tx, user.id, action.bucket ?? "personal");
   const duplicateFingerprint = createDuplicateFingerprintFromParsedAction(user.id, action);
+  const generatedNote = await generateEntryNoteFromParsedAction(action);
 
   const recentDuplicates = await tx.ledgerEntry.findMany({
     where: {
@@ -92,7 +94,7 @@ async function saveParsedActionWithTx(params: {
       category: action.category,
       entryDate: new Date(resolvedEntryDate),
       personName: action.personName,
-      note: action.note,
+      note: generatedNote,
       parserConfidence: new Prisma.Decimal(parserConfidence),
       requiresConfirmation: false,
       duplicateFingerprint,

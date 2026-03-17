@@ -1,15 +1,8 @@
-import { AskAiWorkspace } from "@/components/ask/ask-ai-workspace";
-import { TextEntryWorkspace } from "@/components/entry/text-entry-workspace";
-import { ReminderWorkspace } from "@/components/reminders/reminder-workspace";
-import { DashboardSummaryPanel } from "@/components/summary/dashboard-summary-panel";
+import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { ensureAppProfile } from "@/lib/bootstrap-profile";
 import { getReminderBoard } from "@/lib/reminders/reminder-board";
 import { getDashboardSummary } from "@/lib/summaries/dashboard-summary";
 import { createClient } from "@/lib/supabase/server";
-
-function formatCurrency(amount: number) {
-  return `Rs ${amount.toLocaleString("en-IN")}`;
-}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -28,68 +21,11 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <section className="grid gap-5">
-      <div className="shell-card rounded-[1rem] p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="eyebrow text-brand">Dashboard</p>
-            <h2 className="mt-2 font-mono text-3xl font-semibold text-slate-950 sm:text-4xl">
-              Hello, {profile.displayName ?? "there"}
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
-              Quick entry stays first. Everything else remains visible below in a simpler,
-              more compact workspace.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="soft-card rounded-[0.9rem] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Today
-              </p>
-              <p className="mt-3 font-mono text-2xl font-semibold text-slate-950">
-                {formatCurrency(summary.today.netCashMovement)}
-              </p>
-            </div>
-            <div className="soft-card rounded-[0.9rem] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                This week
-              </p>
-              <p className="mt-3 font-mono text-2xl font-semibold text-slate-950">
-                {formatCurrency(summary.week.netCashMovement)}
-              </p>
-            </div>
-            <div className="soft-card rounded-[0.9rem] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Active reminders
-              </p>
-              <p className="mt-3 font-mono text-2xl font-semibold text-slate-950">
-                {reminders.counts.active}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <TextEntryWorkspace timezone={profile.timezone} defaultBucket="personal" />
-
-      <DashboardSummaryPanel summary={summary} />
-
-      <ReminderWorkspace
-        board={reminders}
-        timezone={profile.timezone}
-        defaultBucket="personal"
-        variant="dashboard"
-      />
-
-      <details className="soft-card rounded-[1rem] p-4 sm:p-5">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
-          Show Ask AI
-        </summary>
-        <div className="mt-5">
-          <AskAiWorkspace timezone={profile.timezone} />
-        </div>
-      </details>
-    </section>
+    <DashboardWorkspace
+      displayName={profile.displayName}
+      timezone={profile.timezone}
+      summary={summary}
+      reminders={reminders}
+    />
   );
 }

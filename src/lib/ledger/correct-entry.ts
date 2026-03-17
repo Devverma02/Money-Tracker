@@ -2,6 +2,7 @@ import { EntryType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createDuplicateFingerprint } from "@/lib/ledger/duplicate-fingerprint";
 import type { CorrectEntryRequest } from "@/lib/ledger/correction-contract";
+import { generateEntryNoteFromLedgerEntry } from "@/lib/ledger/entry-note";
 import { toLedgerEntryType } from "@/lib/ledger/entry-types";
 
 type EntrySnapshot = {
@@ -105,7 +106,16 @@ export async function correctEntry(params: {
     const nextDate = changes.resolvedDate ?? existing.entryDate.toISOString().slice(0, 10);
     const nextCategory = changes.category ?? existing.category;
     const nextPersonName = changes.personName ?? existing.personName;
-    const nextNote = changes.note ?? existing.note;
+    const nextNote =
+      changes.note ??
+      (await generateEntryNoteFromLedgerEntry({
+        entryType: nextEntryType,
+        amount: nextAmount,
+        entryDate: nextDate,
+        personName: nextPersonName,
+        category: nextCategory,
+        sourceText: existing.sourceText,
+      }));
 
     const updatedEntry = await tx.ledgerEntry.update({
       where: {

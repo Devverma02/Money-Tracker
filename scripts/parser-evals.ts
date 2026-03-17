@@ -67,6 +67,40 @@ const cases: EvalCase[] = [
       expectEqual(result.actions[0]?.category, "travel", "category"),
     ].filter(Boolean) as string[],
   },
+  {
+    name: "future kal support",
+    inputText: "Raju se kal 2000 rs aayenge",
+    assert: (result) => {
+      const tomorrow = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+      return [
+        expectEqual(result.actions[0]?.resolvedDate, tomorrow, "resolvedDate"),
+        expectEqual(result.actions[0]?.personName, "Raju", "person name"),
+      ].filter(Boolean) as string[];
+    },
+  },
+  {
+    name: "future parso support",
+    inputText: "Parso 5000 milenge",
+    assert: (result) => {
+      const dayAfterTomorrow = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000));
+
+      return [
+        expectEqual(result.actions[0]?.resolvedDate, dayAfterTomorrow, "resolvedDate"),
+        expectEqual(result.actions[0]?.amount, 5000, "amount"),
+      ].filter(Boolean) as string[];
+    },
+  },
 ];
 
 let failureCount = 0;

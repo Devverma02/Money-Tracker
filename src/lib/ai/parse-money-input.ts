@@ -55,6 +55,8 @@ async function parseWithOpenAI(request: ParseRequest): Promise<ParseResult> {
     "Split multi-entry input into separate actions when the user mentions more than one money update.",
     "Never invent amounts, dates, or people.",
     "Resolve explicit dates like day/month, month names, and weekdays when the user provides them.",
+    "Use the provided current date to resolve relative dates.",
+    "Interpret kal/parso using tense and intent: future phrasing like aayega, aayenge, milega, will receive usually means tomorrow or day after tomorrow; past phrasing like aya, mila, diya usually means yesterday or day before yesterday.",
     "Normalize obvious person-name honorifics and common spending categories when present in the text.",
     "If any key money fact is unclear, set needsClarification=true and ask one short Hinglish clarification question.",
     "Default unresolved bucket to the first allowed bucket.",
@@ -72,6 +74,7 @@ async function parseWithOpenAI(request: ParseRequest): Promise<ParseResult> {
       month: "2-digit",
       day: "2-digit",
     }).format(new Date()),
+    now_iso: new Date().toISOString(),
   });
 
   const response = await fetch("https://api.openai.com/v1/responses", {

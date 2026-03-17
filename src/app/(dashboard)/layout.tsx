@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
-import { AppFooter } from "@/components/chrome/app-footer";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
@@ -20,28 +19,28 @@ export default async function DashboardLayout({
 
   return (
     <>
-      <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
-        <header className="shell-card relative sticky top-3 z-20 rounded-[1rem] px-4 py-3 sm:px-5">
+      <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
+        <header className="shell-card relative sticky top-2 z-20 rounded-xl px-3 py-2.5 sm:px-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-950 text-sm font-bold text-white">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0d9488] text-xs font-bold text-white">
                 MM
               </div>
-              <span className="text-base font-semibold text-slate-950">MoneyManage</span>
+              <span className="text-sm font-semibold text-gray-900">MoneyManage</span>
             </div>
 
-            <div className="hidden items-center gap-3 lg:flex">
-              <nav className="flex flex-wrap gap-2 text-sm font-semibold text-slate-700">
-                <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
+            <div className="hidden items-center gap-2 lg:flex">
+              <nav className="flex gap-0.5 text-sm font-medium text-gray-500">
+                <Link href="/dashboard" className="nav-link rounded-lg px-2.5 py-1.5">
                   Dashboard
                 </Link>
-                <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
+                <Link href="/reminders" className="nav-link rounded-lg px-2.5 py-1.5">
                   Reminders
                 </Link>
-                <Link href="/history" className="nav-link rounded-lg px-3 py-2">
+                <Link href="/history" className="nav-link rounded-lg px-2.5 py-1.5">
                   History
                 </Link>
-                <Link href="/" className="nav-link rounded-lg px-3 py-2">
+                <Link href="/" className="nav-link rounded-lg px-2.5 py-1.5">
                   Home
                 </Link>
               </nav>
@@ -49,26 +48,25 @@ export default async function DashboardLayout({
             </div>
 
             <details className="group lg:hidden">
-              <summary className="flex list-none items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+              <summary className="flex list-none items-center rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm font-medium text-gray-600">
                 Menu
               </summary>
-              <div className="absolute right-4 top-[4.75rem] z-30 w-[min(20rem,calc(100vw-2rem))] rounded-[1rem] border border-slate-200 bg-white p-3 shadow-[0_18px_40px_rgba(16,24,40,0.12)] sm:right-6">
-                <nav className="grid gap-1 text-sm font-semibold text-slate-700">
-                  <Link href="/dashboard" className="nav-link rounded-lg px-3 py-2">
+              <div className="absolute right-3 top-[3.5rem] z-30 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white p-2.5 shadow-lg sm:right-4">
+                <nav className="grid gap-0.5 text-sm font-medium text-gray-600">
+                  <Link href="/dashboard" className="nav-link rounded-lg px-2.5 py-1.5">
                     Dashboard
                   </Link>
-                  <Link href="/reminders" className="nav-link rounded-lg px-3 py-2">
+                  <Link href="/reminders" className="nav-link rounded-lg px-2.5 py-1.5">
                     Reminders
                   </Link>
-                  <Link href="/history" className="nav-link rounded-lg px-3 py-2">
+                  <Link href="/history" className="nav-link rounded-lg px-2.5 py-1.5">
                     History
                   </Link>
-                  <Link href="/" className="nav-link rounded-lg px-3 py-2">
+                  <Link href="/" className="nav-link rounded-lg px-2.5 py-1.5">
                     Home
                   </Link>
                 </nav>
-
-                <div className="mt-3 border-t border-slate-200 pt-3">
+                <div className="mt-2 border-t border-gray-100 pt-2">
                   <SignOutButton />
                 </div>
               </div>
@@ -76,9 +74,8 @@ export default async function DashboardLayout({
           </div>
         </header>
 
-        <div className="py-4 sm:py-5">{children}</div>
+        <div className="py-3 sm:py-4">{children}</div>
       </main>
-      <AppFooter />
     </>
   );
 }

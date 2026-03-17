@@ -2,10 +2,45 @@ import {
   askAiJsonSchema,
   askAiRequestSchema,
   askAiResponseSchema,
+  type AskAiConversationMessage,
   type AskAiResponse,
 } from "@/lib/ai/ask-contract";
 import { getAskAiFacts, type AskAiFacts } from "@/lib/ai/ask-facts";
 import { serverEnv } from "@/lib/env/server";
+
+function buildEffectiveQuestion(
+  question: string,
+  conversation: AskAiConversationMessage[],
+) {
+  const normalized = question.trim();
+
+  if (!normalized) {
+    return question;
+  }
+
+  const looksStandalone =
+    /\b(today|week|month|year|income|expense|spent|spend|loan|udhaar|cash|entry|entries|kitna|kitni|kitne|history|reminder|category|person|raju|salary|aamdani|kharcha|last|recent|latest)\b/i.test(
+      normalized,
+    );
+
+  if (looksStandalone) {
+    return normalized;
+  }
+
+  const lastUserMessage = [...conversation]
+    .reverse()
+    .find((message) => message.role === "user");
+
+  if (!lastUserMessage) {
+    return normalized;
+  }
+
+  if (/^(and|aur|or|usme|uska|what about|then|phir|iske|uske)\b/i.test(normalized)) {
+    return `${lastUserMessage.text}\nFollow-up: ${normalized}`;
+  }
+
+  return normalized;
+}
 
 function buildFallbackAnswer(facts: AskAiFacts): AskAiResponse {
   const normalized = facts.question.toLowerCase();
@@ -171,7 +206,11 @@ function extractStructuredText(payload: unknown) {
   return null;
 }
 
-async function askWithOpenAI(facts: AskAiFacts): Promise<AskAiResponse> {
+async function askWithOpenAI(
+  facts: AskAiFacts,
+  conversation: AskAiConversationMessage[],
+  originalQuestion: string,
+): Promise<AskAiResponse> {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -189,7 +228,11 @@ async function askWithOpenAI(facts: AskAiFacts): Promise<AskAiResponse> {
         },
         {
           role: "user",
-          content: JSON.stringify(facts),
+          content: JSON.stringify({
+            currentQuestion: originalQuestion,
+            recentConversation: conversation,
+            facts,
+          }),
         },
       ],
       text: {
@@ -233,14 +276,20 @@ export async function answerAskAiQuestion(params: {
   userId: string;
   question: string;
   timeZone: string;
+  conversation?: AskAiConversationMessage[];
 }) {
   const request = askAiRequestSchema.parse({
     question: params.question,
     timezone: params.timeZone,
+    conversation: params.conversation ?? [],
   });
+  const effectiveQuestion = buildEffectiveQuestion(
+    request.question,
+    request.conversation,
+  );
   const facts = await getAskAiFacts({
     userId: params.userId,
-    question: request.question,
+    question: effectiveQuestion,
     timeZone: request.timezone,
   });
 
@@ -252,7 +301,7 @@ export async function answerAskAiQuestion(params: {
   }
 
   try {
-    return await askWithOpenAI(facts);
+    return await askWithOpenAI(facts, request.conversation, request.question);
   } catch {
     return buildFallbackAnswer(facts);
   }

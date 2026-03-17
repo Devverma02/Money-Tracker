@@ -5,7 +5,7 @@ type DashboardSummaryPanelProps = {
 };
 
 function formatCurrency(amount: number) {
-  return `Rs ${amount.toLocaleString("en-IN")}`;
+  return `₹${amount.toLocaleString("en-IN")}`;
 }
 
 export function DashboardSummaryPanel({
@@ -30,53 +30,48 @@ export function DashboardSummaryPanel({
   ];
 
   return (
-    <section className="grid gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="eyebrow text-brand">Summary</p>
-          <h2 className="mt-2 font-mono text-2xl font-semibold text-slate-950 sm:text-3xl">
-            Money overview
-          </h2>
-        </div>
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold text-gray-900">Money overview</h2>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
         {summaryCards.map((card) => (
-          <article key={card.label} className="soft-card rounded-[1rem] p-4 sm:p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <article key={card.label} className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-xs font-medium text-gray-400">
               {card.label}
             </p>
-            <p className="mt-3 font-mono text-3xl font-semibold text-slate-950">
+            <p className="mt-2 font-mono text-2xl font-bold text-gray-900">
               {card.amount}
             </p>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{card.helper}</p>
+            <p className="mt-1.5 text-sm text-gray-500">{card.helper}</p>
           </article>
         ))}
       </div>
 
-      <details className="soft-card rounded-[1rem] p-4 sm:p-5">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
-          Show more summary details
+      <details className="rounded-xl border border-gray-200 bg-white p-4">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-gray-900">
+          Show more details ↓
         </summary>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_1fr]">
-          <article className="rounded-[0.9rem] border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
               Pending loans
             </p>
             {summary.pendingLoans.length === 0 ? (
-              <p className="mt-4 text-sm leading-7 text-slate-600">
-                No pending receivable or payable loans were found in your saved entries.
+              <p className="mt-3 text-sm text-gray-500">
+                No pending receivable or payable loans found.
               </p>
             ) : (
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-2">
                 {summary.pendingLoans.slice(0, 5).map((item) => (
                   <div
                     key={item.personName}
-                  className="rounded-[0.85rem] border border-slate-200 bg-white px-4 py-3"
+                    className="rounded-lg border border-gray-200 bg-white p-3"
                   >
-                    <p className="font-semibold text-slate-950">{item.personName}</p>
-                    <div className="mt-2 flex flex-wrap gap-3 text-sm text-slate-600">
+                    <p className="text-sm font-semibold text-gray-900">{item.personName}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-gray-500">
                       <span>To receive: {formatCurrency(item.receivable)}</span>
                       <span>To pay: {formatCurrency(item.payable)}</span>
                     </div>
@@ -84,31 +79,26 @@ export function DashboardSummaryPanel({
                 ))}
               </div>
             )}
-          </article>
+          </div>
 
-          <article className="rounded-[0.9rem] border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
               Insight
             </p>
-            <p className="mt-4 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-6 text-gray-700">
               {summary.insightText}
             </p>
-            <div className="mt-4 rounded-[0.85rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-600">
+            <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-500">
               {summary.topSpendingCategory ? (
                 <p>
-                  Top spending category:{" "}
-                  <span className="font-semibold text-slate-950">
-                    {summary.topSpendingCategory.category}
-                  </span>{" "}
+                  Top spending: <span className="font-semibold text-gray-900">{summary.topSpendingCategory.category}</span>{" "}
                   at {formatCurrency(summary.topSpendingCategory.amount)}.
                 </p>
               ) : (
-                <p>
-                  A top category will appear here once you save more categorized expense entries.
-                </p>
+                <p>Top category will appear once you save more categorized expenses.</p>
               )}
             </div>
-          </article>
+          </div>
         </div>
       </details>
     </section>

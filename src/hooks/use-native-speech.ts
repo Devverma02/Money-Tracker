@@ -35,8 +35,13 @@ export function useNativeSpeech(options: UseNativeSpeechOptions = {}) {
     () => false,
   );
 
-  const speakText = (text: string, language = "en-IN") => {
+  const speakText = (
+    text: string,
+    language = "en-IN",
+    onEnd?: () => void,
+  ) => {
     if (typeof window === "undefined" || !window.speechSynthesis || !text.trim()) {
+      onEnd?.();
       return;
     }
 
@@ -45,6 +50,12 @@ export function useNativeSpeech(options: UseNativeSpeechOptions = {}) {
     utterance.lang = language;
     utterance.rate = 1.02;
     utterance.pitch = 1;
+    utterance.onend = () => {
+      onEnd?.();
+    };
+    utterance.onerror = () => {
+      onEnd?.();
+    };
     window.speechSynthesis.speak(utterance);
   };
 
