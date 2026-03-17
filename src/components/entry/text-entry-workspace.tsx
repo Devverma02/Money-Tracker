@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ParsePreviewCard } from "@/components/entry/parse-preview-card";
 import { RealtimeVoicePanel } from "@/components/entry/realtime-voice-panel";
-import { useBrowserVoice } from "@/hooks/use-browser-voice";
+import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ParseResult, ParsedAction } from "@/lib/ai/parse-contract";
 import type { SaveEntryResponse } from "@/lib/ledger/save-contract";
 
@@ -199,7 +199,7 @@ export function TextEntryWorkspace({
     startListening,
     stopListening,
     speakText,
-  } = useBrowserVoice({
+  } = useNativeSpeech({
     locale: "hi-IN",
     onFinalTranscript: async (transcript) => {
       setInputText(transcript);
