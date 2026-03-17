@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { useBrowserVoice } from "@/hooks/use-browser-voice";
+import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ReminderParseResult } from "@/lib/reminders/reminder-parse-contract";
 import type {
   CreateReminderResponse,
@@ -201,7 +201,7 @@ export function ReminderWorkspace({
     startListening,
     stopListening,
     speakText,
-  } = useBrowserVoice({
+  } = useNativeSpeech({
     locale: "hi-IN",
     onFinalTranscript: async (transcript) => {
       setNaturalInput(transcript);
