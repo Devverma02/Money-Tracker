@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
@@ -12,18 +10,15 @@ import type {
 import type { ReminderBoard, ReminderItem } from "@/lib/reminders/types";
 import { getVoiceReplyContext, voiceText, type VoiceReplyContext } from "@/lib/voice/voice-localization";
 
-const reminderSamples = [
-  "Kal shaam 6 baje Raju ko loan follow up yaad dilana",
-  "Next Monday electricity bill bharna yaad dilana",
-  "Parso subah mummy ko 5000 dene ka reminder lagao",
-];
-
 type ReminderWorkspaceProps = {
   board: ReminderBoard;
   timezone: string;
   defaultBucket: string;
   variant?: "dashboard" | "page";
 };
+
+type ReminderSectionView = "create" | "active" | "closed";
+type ReminderCreateMode = "voice" | "manual";
 
 function formatReminderDate(isoString: string, timeZone: string) {
   return new Intl.DateTimeFormat("en-IN", {
@@ -109,8 +104,14 @@ export function ReminderWorkspace({
   const [isPending, startTransition] = useTransition();
   const [isParsingNatural, startParseTransition] = useTransition();
   const [isSavingNatural, startNaturalSaveTransition] = useTransition();
-  const [showCreateForm, setShowCreateForm] = useState(variant !== "dashboard");
-  const [activeTab, setActiveTab] = useState<"active" | "closed">("active");
+  const [sectionView, setSectionView] = useState<ReminderSectionView>(
+    board.counts.active > 0 || board.counts.overdue > 0
+      ? "active"
+      : board.counts.closed > 0
+        ? "closed"
+        : "create",
+  );
+  const [createMode, setCreateMode] = useState<ReminderCreateMode>("voice");
 
   const visibleActiveReminders = useMemo(
     () =>
@@ -419,9 +420,6 @@ export function ReminderWorkspace({
               Create, track, and manage your follow-ups.
             </p>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500">
-            {board.helperText}
-          </span>
         </div>
 
         {error ? (
@@ -447,72 +445,84 @@ export function ReminderWorkspace({
           </div>
         </div>
 
-        {variant === "page" ? (
-          <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2 rounded-lg bg-gray-100 p-1">
+          {([
+            { id: "create", label: "Create" },
+            { id: "active", label: `Active (${board.counts.active})` },
+            { id: "closed", label: `Closed (${board.counts.closed})` },
+          ] as const).map((item) => (
             <button
+              key={item.id}
               type="button"
-              onClick={() => setShowCreateForm((current) => !current)}
-              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                showCreateForm
-                  ? "bg-gray-100 text-gray-700"
-                  : "primary-button"
+              onClick={() => setSectionView(item.id)}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                sectionView === item.id
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4"><path d="M10 3a.75.75 0 01.75.75v5.5h5.5a.75.75 0 010 1.5h-5.5v5.5a.75.75 0 01-1.5 0v-5.5h-5.5a.75.75 0 010-1.5h5.5v-5.5A.75.75 0 0110 3z" /></svg>
-              {showCreateForm ? "Hide form" : "New reminder"}
+              {item.label}
             </button>
-          </div>
-        ) : null}
+          ))}
+        </div>
       </div>
 
       {/* ── Create form ── */}
-      {showCreateForm ? (
+      {sectionView === "create" ? (
         <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">Create reminder</h3>
-              <p className="mt-0.5 text-sm text-gray-500">
-                Speak or type naturally, review the preview, then confirm.
-              </p>
             </div>
             <span className="inline-flex rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-400">
               Bucket: {defaultBucket}
             </span>
           </div>
 
+          <div className="mt-4 flex flex-wrap gap-2 rounded-lg bg-gray-100 p-1">
+            <button
+              type="button"
+              onClick={() => setCreateMode("voice")}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                createMode === "voice"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Voice
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateMode("manual")}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                createMode === "manual"
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Manual
+            </button>
+          </div>
+
           {/* Natural input */}
-          <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
-            <p className="text-sm font-medium text-gray-900">Natural language</p>
-            <p className="mt-0.5 text-xs text-gray-400">
-              e.g. &quot;Kal shaam 6 baje Raju ko payment follow up yaad dilana&quot;
-            </p>
+          <div
+            className={`mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4 ${
+              createMode === "voice" ? "block" : "hidden"
+            }`}
+          >
 
             <textarea
               value={naturalInput}
               onChange={(event) => setNaturalInput(event.target.value)}
               placeholder="Type or speak a reminder naturally"
-              className="field mt-3 min-h-24 resize-none rounded-lg"
+              className="hidden field mt-3 min-h-24 resize-none rounded-lg"
             />
 
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {reminderSamples.map((sample) => (
-                <button
-                  key={sample}
-                  type="button"
-                  onClick={() => setNaturalInput(sample)}
-                  className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] text-gray-500 transition-colors hover:border-teal-200 hover:bg-teal-50 hover:text-[#0d9488]"
-                >
-                  {sample}
-                </button>
-              ))}
-            </div>
+            <div className="hidden mt-2 flex flex-wrap gap-1.5" />
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-900">🎤 Voice input</p>
-                <p className="mt-0.5 text-xs text-gray-400">
-                  Mic se bolo, app reminder preview bana degi.
-                </p>
+                <p className="text-sm font-medium text-gray-900">Voice reminder</p>
               </div>
               {isVoiceSupported ? (
                 <button
@@ -523,7 +533,7 @@ export function ReminderWorkspace({
                     isListening ? "bg-red-500" : "primary-button"
                   }`}
                 >
-                  {isListening ? "⏹ Stop mic" : "🎙 Start mic"}
+                  {isListening ? "Stop mic" : "Start mic"}
                 </button>
               ) : (
                 <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-400">
@@ -535,7 +545,7 @@ export function ReminderWorkspace({
             {isListening || liveTranscript ? (
               <div className="mt-3 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-gray-700">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[#0d9488]">
-                  {isListening ? "● Listening..." : "Captured transcript"}
+                  {isListening ? "Listening..." : "Captured transcript"}
                 </p>
                 <p className="mt-1">{liveTranscript || "Start speaking..."}</p>
               </div>
@@ -556,19 +566,6 @@ export function ReminderWorkspace({
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
-                onClick={() => runNaturalParse(naturalInput, "text")}
-                disabled={
-                  isPending ||
-                  isParsingNatural ||
-                  isSavingNatural ||
-                  naturalInput.trim().length < 3
-                }
-                className="primary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isParsingNatural ? "Preparing..." : "Generate preview"}
-              </button>
-              <button
-                type="button"
                 onClick={handleSaveParsedReminder}
                 disabled={
                   isPending ||
@@ -578,7 +575,7 @@ export function ReminderWorkspace({
                 }
                 className="secondary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isSavingNatural ? "Saving..." : "✓ Confirm reminder"}
+                {isSavingNatural ? "Saving..." : "Confirm reminder"}
               </button>
             </div>
 
@@ -619,11 +616,19 @@ export function ReminderWorkspace({
           </div>
 
           {/* Manual form */}
-          <div className="mt-4 border-t border-gray-100 pt-4">
+          <div
+            className={`mt-4 border-t border-gray-100 pt-4 ${
+              createMode === "manual" ? "block" : "hidden"
+            }`}
+          >
             <p className="text-sm font-medium text-gray-900">Or fill manually</p>
           </div>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div
+            className={`mt-3 gap-3 sm:grid-cols-2 ${
+              createMode === "manual" ? "grid" : "hidden"
+            }`}
+          >
             <label className="text-sm text-gray-600 sm:col-span-2">
               <span className="font-medium">Reminder title</span>
               <input
@@ -672,7 +677,9 @@ export function ReminderWorkspace({
               title.trim().length < 3 ||
               dueDate.length < 10
             }
-            className="primary-button mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+            className={`primary-button mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto ${
+              createMode === "manual" ? "inline-flex" : "hidden"
+            }`}
           >
             {isPending ? "Saving..." : "Create reminder"}
           </button>
@@ -680,54 +687,64 @@ export function ReminderWorkspace({
       ) : null}
 
       {/* ── Dashboard next-due card ── */}
-      {variant === "dashboard" && board.nextReminder ? (
+      {false ? (
         <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-medium text-gray-400">Next due</p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">{board.nextReminder.title}</p>
-              <p className="mt-0.5 text-xs text-gray-500">
-                {formatReminderDate(board.nextReminder.effectiveDueAt, timezone)}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs font-medium text-gray-400">Next reminder</p>
+              {board.nextReminder ? (
+                <>
+                  <p className="mt-2 text-sm font-semibold text-gray-900">
+                    {board.nextReminder?.title ?? ""}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {formatReminderDate(
+                      board.nextReminder?.effectiveDueAt ?? new Date().toISOString(),
+                      timezone,
+                    )}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 text-sm font-semibold text-gray-900">All clear</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    No reminder is due right now.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs font-medium text-gray-400">What you can do</p>
+              <p className="mt-2 text-sm text-gray-600">
+                Create reminders, work on active follow-ups, and review closed items
+                one section at a time.
               </p>
             </div>
-            <Link
-              href="/reminders"
-              className="secondary-button rounded-lg px-3 py-1.5 text-sm font-medium"
-            >
-              Open reminders
-            </Link>
+
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs font-medium text-gray-400">Quick action</p>
+              <button
+                type="button"
+                onClick={() => setSectionView("create")}
+                className="primary-button mt-2 rounded-lg px-4 py-2 text-sm font-semibold"
+              >
+                Create reminder
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
 
       {/* ── Tab bar + lists ── */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
-        <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("active")}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === "active"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Active ({board.counts.active})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("closed")}
-            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === "closed"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Closed ({board.counts.closed})
-          </button>
-        </div>
+      <div
+        className={`rounded-xl border border-gray-200 bg-white p-4 sm:p-5 ${
+          sectionView === "active" || sectionView === "closed" ? "block" : "hidden"
+        }`}
+      >
+        <div className="hidden" />
 
-        {activeTab === "active" ? (
+        {sectionView === "active" ? (
           <div className="mt-4 space-y-2">
             {visibleActiveReminders.length === 0 ? (
               <div className="py-8 text-center">

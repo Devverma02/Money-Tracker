@@ -2,6 +2,8 @@ import type { DashboardSummary } from "@/lib/summaries/types";
 
 type DashboardSummaryPanelProps = {
   summary: DashboardSummary;
+  activeReminderCount?: number;
+  overdueReminderCount?: number;
 };
 
 function formatCurrency(amount: number) {
@@ -10,6 +12,8 @@ function formatCurrency(amount: number) {
 
 export function DashboardSummaryPanel({
   summary,
+  activeReminderCount = 0,
+  overdueReminderCount = 0,
 }: DashboardSummaryPanelProps) {
   const summaryCards = [
     {
@@ -27,6 +31,11 @@ export function DashboardSummaryPanel({
       amount: formatCurrency(summary.month.netCashMovement),
       helper: `${summary.month.entryCount} entries | in ${formatCurrency(summary.month.cashInTotal)} | out ${formatCurrency(summary.month.cashOutTotal)}`,
     },
+    {
+      label: "Active reminders",
+      amount: String(activeReminderCount),
+      helper: `${overdueReminderCount} overdue reminders`,
+    },
   ];
 
   return (
@@ -35,7 +44,7 @@ export function DashboardSummaryPanel({
         <h2 className="text-xl font-bold text-gray-900">Money overview</h2>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
           <article key={card.label} className="rounded-xl border border-gray-200 bg-white p-4">
             <p className="text-xs font-medium text-gray-400">

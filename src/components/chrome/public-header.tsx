@@ -28,12 +28,6 @@ export async function PublicHeader() {
                 <Link href="/dashboard" className="rounded-md px-3 py-1.5 transition-colors hover:text-gray-900 hover:bg-gray-100">
                   Dashboard
                 </Link>
-                <Link href="/reminders" className="rounded-md px-3 py-1.5 transition-colors hover:text-gray-900 hover:bg-gray-100">
-                  Reminders
-                </Link>
-                <Link href="/history" className="rounded-md px-3 py-1.5 transition-colors hover:text-gray-900 hover:bg-gray-100">
-                  History
-                </Link>
               </>
             ) : null}
           </nav>
@@ -70,12 +64,6 @@ export async function PublicHeader() {
                 <>
                   <Link href="/dashboard" className="rounded-md px-3 py-1.5 hover:bg-gray-50 hover:text-gray-900">
                     Dashboard
-                  </Link>
-                  <Link href="/reminders" className="rounded-md px-3 py-1.5 hover:bg-gray-50 hover:text-gray-900">
-                    Reminders
-                  </Link>
-                  <Link href="/history" className="rounded-md px-3 py-1.5 hover:bg-gray-50 hover:text-gray-900">
-                    History
                   </Link>
                 </>
               ) : null}

@@ -3,8 +3,6 @@ import Link from "next/link";
 const footerLinks = [
   { href: "/", label: "Home" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/reminders", label: "Reminders" },
-  { href: "/history", label: "History" },
 ];
 
 export function AppFooter() {

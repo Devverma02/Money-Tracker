@@ -1,21 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { AskAiWorkspace } from "@/components/ask/ask-ai-workspace";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AskAiWorkspace, type AskMode } from "@/components/ask/ask-ai-workspace";
 import { TextEntryWorkspace } from "@/components/entry/text-entry-workspace";
+import { HistoryWorkspace } from "@/components/history/history-workspace";
 import { ReminderWorkspace } from "@/components/reminders/reminder-workspace";
 import { DashboardSummaryPanel } from "@/components/summary/dashboard-summary-panel";
+import type { HistoryPageData } from "@/lib/ledger/history-types";
 import type { ReminderBoard } from "@/lib/reminders/types";
 import type { DashboardSummary } from "@/lib/summaries/types";
 
 type DashboardWorkspaceProps = {
-  displayName: string | null;
   timezone: string;
   summary: DashboardSummary;
   reminders: ReminderBoard;
+  historyPageData: HistoryPageData;
+  initialSection?: DashboardSectionId;
 };
 
-type DashboardSectionId = "overview" | "entry" | "summary" | "reminders" | "ask-ai";
+type DashboardSectionId =
+  | "overview"
+  | "entry"
+  | "reminders"
+  | "history"
+  | "ask-ai";
 
 type DashboardSection = {
   id: DashboardSectionId;
@@ -52,18 +61,6 @@ const dashboardSections: DashboardSection[] = [
     ),
   },
   {
-    id: "summary",
-    label: "Summary",
-    shortLabel: "SU",
-    title: "Summary",
-    description: "Review totals, trends, pending loans, and current financial movement.",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
-        <path d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
     id: "reminders",
     label: "Reminders",
     shortLabel: "RE",
@@ -72,6 +69,18 @@ const dashboardSections: DashboardSection[] = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
         <path d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "history",
+    label: "History",
+    shortLabel: "HI",
+    title: "History",
+    description: "Review saved entries, filter records, and correct past money updates.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
+        <path d="M12 6v6l4 2.25M21 12a9 9 0 11-3.16-6.87M21 3v6h-6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -88,10 +97,6 @@ const dashboardSections: DashboardSection[] = [
     ),
   },
 ];
-
-function formatCurrency(amount: number) {
-  return `₹${amount.toLocaleString("en-IN")}`;
-}
 
 function findSection(sectionId: DashboardSectionId) {
   return (
@@ -140,37 +145,36 @@ function SidebarNav({
 
 /* ── Overview section ── */
 function OverviewSection({
-  displayName,
   summary,
   reminders,
   onOpenSection,
 }: {
-  displayName: string | null;
   summary: DashboardSummary;
   reminders: ReminderBoard;
   onOpenSection: (sectionId: DashboardSectionId) => void;
 }) {
-  const statCards = [
-    { label: "Today", value: formatCurrency(summary.today.netCashMovement), sub: `${summary.today.entryCount} entries` },
-    { label: "This week", value: formatCurrency(summary.week.netCashMovement), sub: `${summary.week.entryCount} entries` },
-    { label: "This month", value: formatCurrency(summary.month.netCashMovement), sub: `${summary.month.entryCount} entries` },
-    { label: "Active reminders", value: String(reminders.counts.active), sub: `${reminders.counts.overdue} overdue` },
-  ];
+  const statCards: Array<{ label: string; value: string; sub: string }> = [];
 
   return (
     <div className="space-y-4">
+      <DashboardSummaryPanel
+        summary={summary}
+        activeReminderCount={reminders.counts.active}
+        overdueReminderCount={reminders.counts.overdue}
+      />
+
       {/* Welcome */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5">
+      <section className="hidden rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-xl font-bold text-gray-900">
-          Hello, {displayName ?? "there"} 👋
+          Hello there
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          Use the sidebar to jump between entry, summary, reminders, and Ask AI.
+          Use the sidebar to jump between entry, reminders, history, and Ask AI.
         </p>
       </section>
 
       {/* Stats */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="hidden grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map((card) => (
           <article key={card.label} className="rounded-xl border border-gray-200 bg-white p-4">
             <p className="text-xs font-medium text-gray-400">{card.label}</p>
@@ -245,19 +249,44 @@ function OverviewSection({
 
 /* ── Main component ── */
 export function DashboardWorkspace({
-  displayName,
   timezone,
   summary,
   reminders,
+  historyPageData,
+  initialSection = "overview",
 }: DashboardWorkspaceProps) {
-  const [activeSection, setActiveSection] = useState<DashboardSectionId>("overview");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [activeSection, setActiveSection] = useState<DashboardSectionId>(initialSection);
+  const [askAiMode, setAskAiMode] = useState<AskMode>("chat");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const activeSectionMeta = findSection(activeSection);
 
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
+
   const openSection = (sectionId: DashboardSectionId) => {
     setActiveSection(sectionId);
     setIsMobileSidebarOpen(false);
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (sectionId === "overview") {
+      params.delete("section");
+    } else {
+      params.set("section", sectionId);
+    }
+
+    if (sectionId !== "history") {
+      params.delete("page");
+      params.delete("type");
+      params.delete("period");
+    }
+
+    const query = params.toString();
+    router.push(query ? `/dashboard?${query}` : "/dashboard");
   };
 
   return (
@@ -359,21 +388,49 @@ export function DashboardWorkspace({
       <div className="min-w-0 xl:h-full xl:overflow-y-auto">
         {/* Section header */}
         <div className="mb-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50 text-[#0d9488]">
-              {activeSectionMeta.icon}
-            </span>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">{activeSectionMeta.title}</h1>
-              <p className="text-sm text-gray-500">{activeSectionMeta.description}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50 text-[#0d9488]">
+                {activeSectionMeta.icon}
+              </span>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">{activeSectionMeta.title}</h1>
+                <p className="text-sm text-gray-500">{activeSectionMeta.description}</p>
+              </div>
             </div>
+
+            {activeSection === "ask-ai" ? (
+              <div className="flex items-center gap-2 rounded-lg bg-gray-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setAskAiMode("chat")}
+                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                    askAiMode === "chat"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAskAiMode("voice")}
+                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
+                    askAiMode === "voice"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Voice
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
 
         {/* Active section content */}
         {activeSection === "overview" ? (
           <OverviewSection
-            displayName={displayName}
             summary={summary}
             reminders={reminders}
             onOpenSection={openSection}
@@ -382,10 +439,6 @@ export function DashboardWorkspace({
 
         {activeSection === "entry" ? (
           <TextEntryWorkspace timezone={timezone} defaultBucket="personal" />
-        ) : null}
-
-        {activeSection === "summary" ? (
-          <DashboardSummaryPanel summary={summary} />
         ) : null}
 
         {activeSection === "reminders" ? (
@@ -397,8 +450,20 @@ export function DashboardWorkspace({
           />
         ) : null}
 
+        {activeSection === "history" ? (
+          <HistoryWorkspace
+            historyPageData={historyPageData}
+            basePath="/dashboard"
+            sectionId="history"
+          />
+        ) : null}
+
         {activeSection === "ask-ai" ? (
-          <AskAiWorkspace timezone={timezone} />
+          <AskAiWorkspace
+            timezone={timezone}
+            mode={askAiMode}
+            onModeChange={setAskAiMode}
+          />
         ) : null}
       </div>
     </section>

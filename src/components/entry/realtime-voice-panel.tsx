@@ -28,95 +28,67 @@ export function RealtimeVoicePanel() {
   } = useOpenAiRealtimeVoice();
 
   return (
-    <div className="soft-card rounded-[2rem] p-5 sm:p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="eyebrow text-brand">Realtime voice</p>
-          <h3 className="mt-3 font-mono text-2xl font-semibold text-gray-900 sm:text-3xl">
-            Natural back-and-forth voice with low delay.
-          </h3>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-500 sm:text-base">
-            This mode is for fast conversation. The assistant listens and answers out loud,
-            while actual saving still happens only through the reviewed preview flow.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="rounded-full border border-white/70 bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+    <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
             {statusCopy[status]}
           </span>
-          {status === "idle" || status === "error" ? (
-            <button
-              type="button"
-              onClick={connect}
-              disabled={!isSupported || isConnecting}
-              className="primary-button rounded-full px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isConnecting ? "Starting live voice..." : "Start live voice"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={disconnect}
-              className="secondary-button rounded-full px-5 py-3 text-sm font-semibold"
-            >
-              End live voice
-            </button>
-          )}
+          {assistantLiveTranscript ? (
+            <span className="text-sm text-gray-500">Listening live</span>
+          ) : null}
         </div>
+
+        {status === "idle" || status === "error" ? (
+          <button
+            type="button"
+            onClick={connect}
+            disabled={!isSupported || isConnecting}
+            className="primary-button rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {isConnecting ? "Starting..." : "Start live voice"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={disconnect}
+            className="secondary-button rounded-lg px-4 py-2.5 text-sm font-semibold"
+          >
+            End live voice
+          </button>
+        )}
       </div>
 
       {!isSupported ? (
-        <p className="status-danger mt-4 rounded-2xl border px-4 py-3 text-sm">
+        <p className="status-danger mt-4 rounded-lg border px-4 py-3 text-sm">
           This browser does not support WebRTC voice sessions.
         </p>
       ) : null}
 
       {error ? (
-        <p className="status-danger mt-4 rounded-2xl border px-4 py-3 text-sm">
+        <p className="status-danger mt-4 rounded-lg border px-4 py-3 text-sm">
           {error}
         </p>
       ) : null}
 
       {assistantLiveTranscript ? (
-        <div className="mt-5 rounded-[1.5rem] bg-gray-900 px-4 py-4 text-sm leading-7 text-gray-100">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
-            Assistant live transcript
-          </p>
-          <p className="mt-2">{assistantLiveTranscript}</p>
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-4 text-sm leading-7 text-gray-700">
+          <p>{assistantLiveTranscript}</p>
         </div>
       ) : null}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
-        <div className="rounded-[1.5rem] border border-gray-200 bg-white/80 p-4">
-          <p className="text-sm font-semibold text-gray-900">How this mode behaves</p>
-          <ul className="mt-3 space-y-2 text-sm leading-7 text-gray-500">
-            <li>It listens continuously after you start the live session.</li>
-            <li>Replies are kept short so the turn feels natural.</li>
-            <li>If you mention a transaction, it should tell you to review the preview before saving.</li>
-          </ul>
-        </div>
-
-        <div className="rounded-[1.5rem] border border-gray-200 bg-white/80 p-4">
-          <p className="text-sm font-semibold text-gray-900">Recent assistant replies</p>
-          {messages.length === 0 ? (
-            <p className="mt-3 text-sm leading-7 text-gray-400">
-              Start the live session and speak naturally. Short assistant replies will appear here.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-3">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className="rounded-[1.2rem] border border-white/70 bg-white px-4 py-3 text-sm leading-7 text-gray-700"
-                >
-                  {message.text}
-                </div>
-              ))}
+      {messages.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-7 text-gray-700"
+            >
+              {message.text}
             </div>
-          )}
+          ))}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

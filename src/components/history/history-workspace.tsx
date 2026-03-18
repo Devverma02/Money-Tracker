@@ -7,6 +7,8 @@ import type { HistoryPageData } from "@/lib/ledger/history-types";
 
 type HistoryWorkspaceProps = {
   historyPageData: HistoryPageData;
+  basePath?: string;
+  sectionId?: string;
 };
 
 const correctionTypes = [
@@ -63,8 +65,15 @@ function formatEntryType(entryType: string) {
   return entryType.replaceAll("_", " ").toLowerCase();
 }
 
-function buildHistoryHref(params: { page?: number; type?: string; period?: string }) {
+function buildHistoryHref(params: {
+  page?: number;
+  type?: string;
+  period?: string;
+  basePath?: string;
+  sectionId?: string;
+}) {
   const searchParams = new URLSearchParams();
+  const basePath = params.basePath ?? "/history";
 
   if (params.page && params.page > 1) {
     searchParams.set("page", String(params.page));
@@ -78,11 +87,19 @@ function buildHistoryHref(params: { page?: number; type?: string; period?: strin
     searchParams.set("period", params.period);
   }
 
+  if (params.sectionId) {
+    searchParams.set("section", params.sectionId);
+  }
+
   const query = searchParams.toString();
-  return query ? `/history?${query}` : "/history";
+  return query ? `${basePath}?${query}` : basePath;
 }
 
-export function HistoryWorkspace({ historyPageData }: HistoryWorkspaceProps) {
+export function HistoryWorkspace({
+  historyPageData,
+  basePath = "/history",
+  sectionId,
+}: HistoryWorkspaceProps) {
   const router = useRouter();
   const [openEntryId, setOpenEntryId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +120,8 @@ export function HistoryWorkspace({ historyPageData }: HistoryWorkspaceProps) {
         page: 1,
         type: selectedType,
         period: selectedPeriod,
+        basePath,
+        sectionId,
       }),
     );
   };
@@ -294,6 +313,8 @@ export function HistoryWorkspace({ historyPageData }: HistoryWorkspaceProps) {
                 page: historyPageData.page - 1,
                 type: historyPageData.filters.entryType,
                 period: historyPageData.filters.period,
+                basePath,
+                sectionId,
               })}
               aria-disabled={historyPageData.page <= 1}
               className={`secondary-button rounded-lg px-3 py-1.5 text-sm font-medium ${
@@ -307,6 +328,8 @@ export function HistoryWorkspace({ historyPageData }: HistoryWorkspaceProps) {
                 page: historyPageData.page + 1,
                 type: historyPageData.filters.entryType,
                 period: historyPageData.filters.period,
+                basePath,
+                sectionId,
               })}
               aria-disabled={historyPageData.page >= historyPageData.totalPages}
               className={`secondary-button rounded-lg px-3 py-1.5 text-sm font-medium ${

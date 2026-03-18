@@ -2,23 +2,17 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ParsePreviewCard } from "@/components/entry/parse-preview-card";
-import { RealtimeVoicePanel } from "@/components/entry/realtime-voice-panel";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ParseResult, ParsedAction } from "@/lib/ai/parse-contract";
 import type { SaveEntryResponse } from "@/lib/ledger/save-contract";
 import { getVoiceReplyContext, voiceText, type VoiceReplyContext } from "@/lib/voice/voice-localization";
 
-const sampleInputs = [
-  "Spent 480 on groceries today",
-  "Gave Raju 2000 as a loan yesterday",
-  "Received salary income of 15000",
-  "Aaj 480 grocery aur 200 petrol, kal Raju ko 1000 udhaar diya",
-];
-
 type TextEntryWorkspaceProps = {
   timezone: string;
   defaultBucket: string;
 };
+
+type EntryInputMode = "mic" | "typing";
 
 function isActionReady(action: ParsedAction) {
   return Boolean(
@@ -90,6 +84,7 @@ export function TextEntryWorkspace({
   const [awaitingVoiceClarification, setAwaitingVoiceClarification] = useState(false);
   const [voiceConversationText, setVoiceConversationText] = useState("");
   const [lastInputMode, setLastInputMode] = useState<"text" | "voice" | null>(null);
+  const [entryInputMode, setEntryInputMode] = useState<EntryInputMode>("typing");
   const [isParsing, startParseTransition] = useTransition();
   const [isSaving, startSaveTransition] = useTransition();
 
@@ -482,96 +477,95 @@ export function TextEntryWorkspace({
       {/* ── Input panel ── */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Add money updates</h2>
-            <p className="mt-0.5 text-sm text-gray-500">
-              Write or speak naturally. Multiple updates split into separate previews.
-            </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setEntryInputMode("mic")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                entryInputMode === "mic"
+                  ? "bg-[#0d9488] text-white"
+                  : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              Mic
+            </button>
+            <button
+              type="button"
+              onClick={() => setEntryInputMode("typing")}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+                entryInputMode === "typing"
+                  ? "bg-[#0d9488] text-white"
+                  : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              Typing
+            </button>
           </div>
           <span className="inline-flex rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-400">
             Bucket: {defaultBucket}
           </span>
         </div>
 
-        <label className="mt-4 block text-sm font-medium text-gray-600">
-          Money update
-        </label>
-        <textarea
-          value={inputText}
-          onChange={(event) => setInputText(event.target.value)}
-          placeholder="e.g. Aaj 480 groceries aur 200 petrol, kal Raju ko 1000 udhaar diya"
-          className="field mt-1.5 min-h-28 resize-none rounded-lg"
-        />
+        {entryInputMode === "typing" ? (
+          <textarea
+            value={inputText}
+            onChange={(event) => setInputText(event.target.value)}
+            placeholder="Type here"
+            className="field mt-4 min-h-32 resize-none rounded-lg"
+          />
+        ) : null}
 
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {sampleInputs.map((sample) => (
-            <button
-              key={sample}
-              type="button"
-              onClick={() => setInputText(sample)}
-              className="rounded-full border border-gray-200 bg-white px-3 py-1 text-[11px] text-gray-500 transition-colors hover:border-teal-200 hover:bg-teal-50 hover:text-[#0d9488]"
-            >
-              {sample}
-            </button>
-          ))}
-        </div>
-
-        {/* Voice options — collapsible */}
-        <details className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-3">
-          <summary className="cursor-pointer list-none text-sm font-medium text-gray-900">
-            🎤 Voice options
-          </summary>
-
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-gray-400">
-              Speak naturally. Multiple money updates will be split into previews.
-            </p>
-            {isVoiceSupported ? (
-              <button
-                type="button"
-                onClick={isListening ? stopListening : startListening}
-                disabled={isParsing || isSaving}
-                className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
-                  isListening ? "bg-red-500" : "primary-button"
-                }`}
-              >
-                {isListening ? "⏹ Stop mic" : "🎙 Start mic"}
-              </button>
-            ) : (
-              <span className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-400">
-                Browser mic not supported
-              </span>
-            )}
-          </div>
-
-          {isListening || liveTranscript ? (
-            <div className="mt-3 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-gray-700">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#0d9488]">
-                {isListening ? "● Listening..." : "Captured transcript"}
-              </p>
-              <p className="mt-1">{liveTranscript || "Start speaking..."}</p>
+        {entryInputMode === "mic" ? (
+          <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              {isVoiceSupported ? (
+                <button
+                  type="button"
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={isParsing || isSaving}
+                  className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70 ${
+                    isListening ? "bg-red-500" : "primary-button"
+                  }`}
+                >
+                  {isListening ? "Stop mic" : "Start mic"}
+                </button>
+              ) : (
+                <span className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-400">
+                  Browser mic not supported
+                </span>
+              )}
             </div>
-          ) : null}
 
-          {voiceError ? (
-            <p className="status-danger mt-3 rounded-lg border px-3 py-2 text-sm">{voiceError}</p>
-          ) : null}
+            {isListening || liveTranscript ? (
+              <div className="mt-3 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-gray-700">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#0d9488]">
+                  {isListening ? "Listening..." : "Captured transcript"}
+                </p>
+                <p className="mt-1">{liveTranscript || "Start speaking..."}</p>
+              </div>
+            ) : null}
 
-          {voiceMessage ? (
-            <p className="status-positive mt-3 rounded-lg border px-3 py-2 text-sm">{voiceMessage}</p>
-          ) : null}
-        </details>
+            {voiceError ? (
+              <p className="status-danger mt-3 rounded-lg border px-3 py-2 text-sm">{voiceError}</p>
+            ) : null}
 
+            {voiceMessage ? (
+              <p className="status-positive mt-3 rounded-lg border px-3 py-2 text-sm">{voiceMessage}</p>
+            ) : null}
+          </div>
+        ) : null}
         {/* Action buttons */}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={handleParse}
-            disabled={isParsing || isSaving || inputText.trim().length < 2}
-            className="primary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isParsing ? "Reviewing..." : "Generate preview"}
-          </button>
+          {entryInputMode === "typing" ? (
+            <button
+              type="button"
+              onClick={handleParse}
+              disabled={isParsing || isSaving || inputText.trim().length < 2}
+              className="primary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isParsing ? "Reviewing..." : "Generate preview"}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={handleSave}
@@ -614,7 +608,7 @@ export function TextEntryWorkspace({
 
           {!result ? (
             <div className="mt-3 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-400">
-              No preview yet. Enter money updates and click &quot;Generate preview&quot;.
+              No preview yet.
             </div>
           ) : (
             <div className="mt-3 space-y-3">
@@ -683,15 +677,8 @@ export function TextEntryWorkspace({
           );
         })}
 
-        <details className="rounded-xl border border-gray-200 bg-white p-4">
-          <summary className="cursor-pointer list-none text-sm font-medium text-gray-900">
-            🔊 Live voice assistant
-          </summary>
-          <div className="mt-3">
-            <RealtimeVoicePanel />
-          </div>
-        </details>
       </div>
     </section>
   );
 }
+

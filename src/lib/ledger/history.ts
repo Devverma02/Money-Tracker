@@ -7,23 +7,93 @@ import type {
   HistoryPageData,
 } from "@/lib/ledger/history-types";
 
-function getPeriodStart(period: HistoryFilterPeriod) {
+function getZonedDateParts(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = formatter.formatToParts(date);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+    second: Number(values.second),
+  };
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string) {
+  const parts = getZonedDateParts(date, timeZone);
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+
+  return asUtc - date.getTime();
+}
+
+function zonedDateTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  timeZone: string,
+) {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const offset = getTimeZoneOffsetMs(utcGuess, timeZone);
+
+  return new Date(utcGuess.getTime() - offset);
+}
+
+function getPeriodStart(period: HistoryFilterPeriod, timeZone: string) {
   const now = new Date();
+  const zonedNow = getZonedDateParts(now, timeZone);
 
   if (period === "today") {
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return zonedDateTimeToUtc(
+      zonedNow.year,
+      zonedNow.month,
+      zonedNow.day,
+      timeZone,
+    );
   }
 
   if (period === "week") {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const day = start.getDay();
+    const startDay = new Date(
+      Date.UTC(zonedNow.year, zonedNow.month - 1, zonedNow.day),
+    );
+    const day = startDay.getUTCDay();
     const diff = day === 0 ? 6 : day - 1;
-    start.setDate(start.getDate() - diff);
-    return start;
+    const mondayUtc = new Date(
+      Date.UTC(zonedNow.year, zonedNow.month - 1, zonedNow.day - diff),
+    );
+
+    return zonedDateTimeToUtc(
+      mondayUtc.getUTCFullYear(),
+      mondayUtc.getUTCMonth() + 1,
+      mondayUtc.getUTCDate(),
+      timeZone,
+    );
   }
 
   if (period === "month") {
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    return zonedDateTimeToUtc(zonedNow.year, zonedNow.month, 1, timeZone);
   }
 
   return null;
@@ -82,19 +152,24 @@ function mapHistoryEntry(entry: {
 
 export async function getRecentEntries(
   userId: string,
+  timeZone: string,
   input?: Partial<HistoryFilters>,
 ): Promise<HistoryPageData> {
   const filters = normalizeFilters(input);
-  const periodStart = getPeriodStart(filters.period);
+  const periodStart = getPeriodStart(filters.period, timeZone);
   const where = {
     userId,
     ...(filters.entryType ? { entryType: filters.entryType as never } : {}),
     ...(periodStart ? { entryDate: { gte: periodStart } } : {}),
   };
 
-  const [totalCount, entries] = await Promise.all([
-    prisma.ledgerEntry.count({ where }),
-    prisma.ledgerEntry.findMany({
+  const totalCount = await prisma.ledgerEntry.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalCount / filters.pageSize));
+  const safePage = Math.min(filters.page, totalPages);
+  const entries =
+    totalCount === 0
+      ? []
+      : await prisma.ledgerEntry.findMany({
       where,
       select: {
         id: true,
@@ -115,22 +190,22 @@ export async function getRecentEntries(
           },
         },
       },
-      skip: (filters.page - 1) * filters.pageSize,
+      skip: (safePage - 1) * filters.pageSize,
       take: filters.pageSize,
       orderBy: {
         createdAt: "desc",
       },
-    }),
-  ]);
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / filters.pageSize));
+    });
 
   return {
     entries: entries.map(mapHistoryEntry),
     totalCount,
-    page: Math.min(filters.page, totalPages),
+    page: safePage,
     pageSize: filters.pageSize,
     totalPages,
-    filters,
+    filters: {
+      ...filters,
+      page: safePage,
+    },
   };
 }

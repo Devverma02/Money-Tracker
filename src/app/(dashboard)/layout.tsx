@@ -34,12 +34,6 @@ export default async function DashboardLayout({
                 <Link href="/dashboard" className="nav-link rounded-lg px-2.5 py-1.5">
                   Dashboard
                 </Link>
-                <Link href="/reminders" className="nav-link rounded-lg px-2.5 py-1.5">
-                  Reminders
-                </Link>
-                <Link href="/history" className="nav-link rounded-lg px-2.5 py-1.5">
-                  History
-                </Link>
                 <Link href="/" className="nav-link rounded-lg px-2.5 py-1.5">
                   Home
                 </Link>
@@ -55,12 +49,6 @@ export default async function DashboardLayout({
                 <nav className="grid gap-0.5 text-sm font-medium text-gray-600">
                   <Link href="/dashboard" className="nav-link rounded-lg px-2.5 py-1.5">
                     Dashboard
-                  </Link>
-                  <Link href="/reminders" className="nav-link rounded-lg px-2.5 py-1.5">
-                    Reminders
-                  </Link>
-                  <Link href="/history" className="nav-link rounded-lg px-2.5 py-1.5">
-                    History
                   </Link>
                   <Link href="/" className="nav-link rounded-lg px-2.5 py-1.5">
                     Home
