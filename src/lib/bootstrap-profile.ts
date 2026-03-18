@@ -30,8 +30,6 @@ export async function ensureAppProfile(user: User) {
       update: {
         email: user.email ?? null,
         displayName,
-        preferredLanguage: PreferredLanguage.HINGLISH,
-        timezone: "Asia/Kolkata",
       },
       create: {
         id: user.id,

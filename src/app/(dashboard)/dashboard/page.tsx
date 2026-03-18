@@ -2,6 +2,7 @@ import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { ensureAppProfile } from "@/lib/bootstrap-profile";
 import { getRecentEntries } from "@/lib/ledger/history";
 import { getReminderBoard } from "@/lib/reminders/reminder-board";
+import { settingsResponseSchema } from "@/lib/settings/settings-contract";
 import { getDashboardSummary } from "@/lib/summaries/dashboard-summary";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,6 +21,7 @@ const allowedSections = new Set([
   "reminders",
   "history",
   "ask-ai",
+  "settings",
 ] as const);
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
@@ -41,7 +43,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           | "entry"
           | "reminders"
           | "history"
-          | "ask-ai")
+          | "ask-ai"
+          | "settings")
       : "overview";
 
   const [summary, reminders, historyPageData] = await Promise.all([
@@ -62,6 +65,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   return (
     <DashboardWorkspace
       timezone={profile.timezone}
+      settings={settingsResponseSchema.parse({
+        displayName: profile.displayName ?? "",
+        email: profile.email ?? null,
+        preferredLanguage: profile.preferredLanguage ?? "HINGLISH",
+        timezone: profile.timezone ?? "Asia/Kolkata",
+        voiceRepliesEnabled: profile.voiceRepliesEnabled ?? true,
+        reminderDefaultTime: profile.reminderDefaultTime ?? "09:00",
+        preferredEntryInput: profile.preferredEntryInput ?? "TYPING",
+      })}
       summary={summary}
       reminders={reminders}
       historyPageData={historyPageData}

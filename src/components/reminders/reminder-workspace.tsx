@@ -2,6 +2,10 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
+import {
+  getSpeechLocaleForLanguage,
+  type PreferredLanguageValue,
+} from "@/lib/settings/settings-contract";
 import type { ReminderParseResult } from "@/lib/reminders/reminder-parse-contract";
 import type {
   CreateReminderResponse,
@@ -14,6 +18,9 @@ type ReminderWorkspaceProps = {
   board: ReminderBoard;
   timezone: string;
   defaultBucket: string;
+  preferredLanguage: PreferredLanguageValue;
+  voiceRepliesEnabled: boolean;
+  defaultReminderTime: string;
   variant?: "dashboard" | "page";
 };
 
@@ -83,13 +90,16 @@ export function ReminderWorkspace({
   board,
   timezone,
   defaultBucket,
+  preferredLanguage,
+  voiceRepliesEnabled,
+  defaultReminderTime,
   variant = "page",
 }: ReminderWorkspaceProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [linkedPerson, setLinkedPerson] = useState("");
   const [dueDate, setDueDate] = useState(buildLocalDate());
-  const [dueTime, setDueTime] = useState("");
+  const [dueTime, setDueTime] = useState(defaultReminderTime);
   const [snoozeMap, setSnoozeMap] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -197,7 +207,7 @@ export function ReminderWorkspace({
           setVoiceReplyContext(context);
           const reply = buildVoiceReply(payload, context);
           setVoiceMessage(reply);
-          speakText(reply, context.speechLang);
+          speakIfEnabled(reply, context.speechLang);
         }
       } catch (caughtError) {
         setNaturalError(
@@ -215,7 +225,7 @@ export function ReminderWorkspace({
             hindi: "मैं रिमाइंडर साफ़ तरीके से तैयार नहीं कर पाया। कृपया फिर से बोलिए।",
           });
           setVoiceMessage(reply);
-          speakText(reply, context.speechLang);
+          speakIfEnabled(reply, context.speechLang);
         }
       }
     });
@@ -230,12 +240,20 @@ export function ReminderWorkspace({
     stopListening,
     speakText,
   } = useNativeSpeech({
-    locale: "hi-IN",
+    locale: getSpeechLocaleForLanguage(preferredLanguage),
     onFinalTranscript: async (transcript) => {
       setNaturalInput(transcript);
       runNaturalParse(transcript, "voice");
     },
   });
+
+  const speakIfEnabled = (text: string, language: string) => {
+    if (!voiceRepliesEnabled) {
+      return;
+    }
+
+    speakText(text, language);
+  };
 
   const handleCreateReminder = () => {
     startTransition(async () => {
@@ -275,7 +293,7 @@ export function ReminderWorkspace({
         setTitle("");
         setLinkedPerson("");
         setDueDate(buildLocalDate());
-        setDueTime("");
+        setDueTime(defaultReminderTime);
         setSuccess(payload.message);
         router.refresh();
       } catch (caughtError) {
@@ -334,7 +352,7 @@ export function ReminderWorkspace({
         setParsedReminder(null);
         setVoiceMessage(null);
         setSuccess(payload.message);
-        speakText(
+        speakIfEnabled(
           voiceText(voiceReplyContext, {
             english: "Reminder saved successfully.",
             hinglish: "Reminder successfully save ho gaya.",
@@ -375,7 +393,7 @@ export function ReminderWorkspace({
               ? JSON.stringify({
                   snoozeUntil: combineLocalDateTime(
                     buildLocalDate(1),
-                    snoozeMap[reminderId] || "09:00",
+                    snoozeMap[reminderId] || defaultReminderTime,
                   ),
                 })
               : undefined,

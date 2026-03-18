@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const askAiReplyLanguageSchema = z.enum(["english", "hinglish", "hindi"]);
+
 export const askAiConversationMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   text: z.string().trim().min(1).max(500),
@@ -8,6 +10,7 @@ export const askAiConversationMessageSchema = z.object({
 export const askAiRequestSchema = z.object({
   question: z.string().trim().min(3).max(300),
   timezone: z.string().default("Asia/Kolkata"),
+  replyLanguage: askAiReplyLanguageSchema.default("hinglish"),
   conversation: z.array(askAiConversationMessageSchema).max(12).default([]),
 });
 
@@ -25,6 +28,7 @@ export type AskAiResponse = z.infer<typeof askAiResponseSchema>;
 export type AskAiConversationMessage = z.infer<
   typeof askAiConversationMessageSchema
 >;
+export type AskAiReplyLanguage = z.infer<typeof askAiReplyLanguageSchema>;
 
 export const askAiJsonSchema = {
   type: "object",

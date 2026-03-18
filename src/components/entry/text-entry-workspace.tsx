@@ -5,11 +5,19 @@ import { ParsePreviewCard } from "@/components/entry/parse-preview-card";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ParseResult, ParsedAction } from "@/lib/ai/parse-contract";
 import type { SaveEntryResponse } from "@/lib/ledger/save-contract";
+import {
+  getSpeechLocaleForLanguage,
+  type EntryInputPreferenceValue,
+  type PreferredLanguageValue,
+} from "@/lib/settings/settings-contract";
 import { getVoiceReplyContext, voiceText, type VoiceReplyContext } from "@/lib/voice/voice-localization";
 
 type TextEntryWorkspaceProps = {
   timezone: string;
   defaultBucket: string;
+  preferredLanguage: PreferredLanguageValue;
+  voiceRepliesEnabled: boolean;
+  initialInputMode: EntryInputPreferenceValue;
 };
 
 type EntryInputMode = "mic" | "typing";
@@ -69,6 +77,9 @@ function buildResultSummary(actions: ParsedAction[]) {
 export function TextEntryWorkspace({
   timezone,
   defaultBucket,
+  preferredLanguage,
+  voiceRepliesEnabled,
+  initialInputMode,
 }: TextEntryWorkspaceProps) {
   const [inputText, setInputText] = useState("");
   const [result, setResult] = useState<ParseResult | null>(null);
@@ -84,7 +95,9 @@ export function TextEntryWorkspace({
   const [awaitingVoiceClarification, setAwaitingVoiceClarification] = useState(false);
   const [voiceConversationText, setVoiceConversationText] = useState("");
   const [lastInputMode, setLastInputMode] = useState<"text" | "voice" | null>(null);
-  const [entryInputMode, setEntryInputMode] = useState<EntryInputMode>("typing");
+  const [entryInputMode, setEntryInputMode] = useState<EntryInputMode>(
+    initialInputMode === "MIC" ? "mic" : "typing",
+  );
   const [isParsing, startParseTransition] = useTransition();
   const [isSaving, startSaveTransition] = useTransition();
 
@@ -313,7 +326,7 @@ export function TextEntryWorkspace({
           setVoiceMessage(voiceResponse.reply);
           setVoiceConversationText(nextInputText);
           setAwaitingVoiceClarification(voiceResponse.shouldRelisten);
-          speakText(voiceResponse.reply, context.speechLang, () => {
+          speakIfEnabled(voiceResponse.reply, context.speechLang, () => {
             if (voiceResponse.shouldRelisten) {
               startListening();
             }
@@ -332,7 +345,7 @@ export function TextEntryWorkspace({
             hindi: "मैं इसे साफ़ समझ नहीं पाया। कृपया एक बार फिर बोलिए।",
           });
           setVoiceMessage(reply);
-          speakText(reply, context.speechLang);
+          speakIfEnabled(reply, context.speechLang);
           setVoiceConversationText(nextInputText);
           setAwaitingVoiceClarification(false);
         }
@@ -349,7 +362,7 @@ export function TextEntryWorkspace({
     stopListening,
     speakText,
   } = useNativeSpeech({
-    locale: "hi-IN",
+    locale: getSpeechLocaleForLanguage(preferredLanguage),
     onFinalTranscript: async (transcript) => {
       const combinedTranscript =
         awaitingVoiceClarification && voiceConversationText.trim().length > 0
@@ -363,6 +376,15 @@ export function TextEntryWorkspace({
 
   const handleParse = () => {
     runParse(inputText, "text");
+  };
+
+  const speakIfEnabled = (text: string, language: string, onEnd?: () => void) => {
+    if (!voiceRepliesEnabled) {
+      onEnd?.();
+      return;
+    }
+
+    speakText(text, language, onEnd);
   };
 
   const handleToggleSelect = (index: number) => {
@@ -418,7 +440,7 @@ export function TextEntryWorkspace({
         );
 
         if (lastInputMode === "voice") {
-          speakText(
+          speakIfEnabled(
             voiceText(voiceReplyContext, {
               english:
                 payload.savedCount === 1

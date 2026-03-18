@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AskAiWorkspace, type AskMode } from "@/components/ask/ask-ai-workspace";
+import { AskAiWorkspace } from "@/components/ask/ask-ai-workspace";
 import { TextEntryWorkspace } from "@/components/entry/text-entry-workspace";
 import { HistoryWorkspace } from "@/components/history/history-workspace";
 import { ReminderWorkspace } from "@/components/reminders/reminder-workspace";
+import { SettingsWorkspace } from "@/components/settings/settings-workspace";
+import type { SettingsResponse } from "@/lib/settings/settings-contract";
 import { DashboardSummaryPanel } from "@/components/summary/dashboard-summary-panel";
 import type { HistoryPageData } from "@/lib/ledger/history-types";
 import type { ReminderBoard } from "@/lib/reminders/types";
@@ -13,6 +15,7 @@ import type { DashboardSummary } from "@/lib/summaries/types";
 
 type DashboardWorkspaceProps = {
   timezone: string;
+  settings: SettingsResponse;
   summary: DashboardSummary;
   reminders: ReminderBoard;
   historyPageData: HistoryPageData;
@@ -24,7 +27,8 @@ type DashboardSectionId =
   | "entry"
   | "reminders"
   | "history"
-  | "ask-ai";
+  | "ask-ai"
+  | "settings";
 
 type DashboardSection = {
   id: DashboardSectionId;
@@ -93,6 +97,18 @@ const dashboardSections: DashboardSection[] = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
         <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    shortLabel: "SE",
+    title: "Settings",
+    description: "Save your language, voice, and default preferences.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
+        <path d="M10.5 6h3m-7.5 6h12m-9 6h6M4.5 6h.008v.008H4.5V6zm0 6h.008v.008H4.5V12zm0 6h.008v.008H4.5V18zm15 0h.008v.008H19.5V18zm0-6h.008v.008H19.5V12zm0-6h.008v.008H19.5V6z" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -250,6 +266,7 @@ function OverviewSection({
 /* ── Main component ── */
 export function DashboardWorkspace({
   timezone,
+  settings,
   summary,
   reminders,
   historyPageData,
@@ -258,7 +275,6 @@ export function DashboardWorkspace({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<DashboardSectionId>(initialSection);
-  const [askAiMode, setAskAiMode] = useState<AskMode>("chat");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const activeSectionMeta = findSection(activeSection);
@@ -399,32 +415,6 @@ export function DashboardWorkspace({
               </div>
             </div>
 
-            {activeSection === "ask-ai" ? (
-              <div className="flex items-center gap-2 rounded-lg bg-gray-100 p-1">
-                <button
-                  type="button"
-                  onClick={() => setAskAiMode("chat")}
-                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
-                    askAiMode === "chat"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Chat
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAskAiMode("voice")}
-                  className={`rounded-md px-4 py-2 text-sm font-semibold transition ${
-                    askAiMode === "voice"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  Voice
-                </button>
-              </div>
-            ) : null}
           </div>
         </div>
 
@@ -438,7 +428,13 @@ export function DashboardWorkspace({
         ) : null}
 
         {activeSection === "entry" ? (
-          <TextEntryWorkspace timezone={timezone} defaultBucket="personal" />
+          <TextEntryWorkspace
+            timezone={timezone}
+            defaultBucket="personal"
+            preferredLanguage={settings.preferredLanguage}
+            voiceRepliesEnabled={settings.voiceRepliesEnabled}
+            initialInputMode={settings.preferredEntryInput}
+          />
         ) : null}
 
         {activeSection === "reminders" ? (
@@ -446,6 +442,9 @@ export function DashboardWorkspace({
             board={reminders}
             timezone={timezone}
             defaultBucket="personal"
+            preferredLanguage={settings.preferredLanguage}
+            voiceRepliesEnabled={settings.voiceRepliesEnabled}
+            defaultReminderTime={settings.reminderDefaultTime}
             variant="page"
           />
         ) : null}
@@ -461,9 +460,13 @@ export function DashboardWorkspace({
         {activeSection === "ask-ai" ? (
           <AskAiWorkspace
             timezone={timezone}
-            mode={askAiMode}
-            onModeChange={setAskAiMode}
+            preferredLanguage={settings.preferredLanguage}
+            voiceRepliesEnabled={settings.voiceRepliesEnabled}
           />
+        ) : null}
+
+        {activeSection === "settings" ? (
+          <SettingsWorkspace settings={settings} />
         ) : null}
       </div>
     </section>

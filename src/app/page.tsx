@@ -21,7 +21,7 @@ const features = [
   },
   {
     title: "Voice-first capture",
-    desc: "Speak your updates naturally. The app transcribes, parses, and replies back — all in your language.",
+    desc: "Speak your updates naturally. The app captures device speech, parses it, and replies back in your language.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
         <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" strokeLinecap="round" strokeLinejoin="round" />
@@ -121,8 +121,8 @@ export default async function Home() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Voice engine</p>
-                <p className="mt-2 font-mono text-xl font-bold text-gray-900">OpenAI STT</p>
-                <p className="mt-1.5 text-sm text-gray-500">High-accuracy transcription for Hindi, English, and Hinglish.</p>
+                <p className="mt-2 font-mono text-xl font-bold text-gray-900">Device speech</p>
+                <p className="mt-1.5 text-sm text-gray-500">Native browser speech capture for Hindi, English, and Hinglish.</p>
               </div>
               <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">AI answers</p>
@@ -196,3 +196,4 @@ export default async function Home() {
     </>
   );
 }
+
