@@ -72,6 +72,8 @@ model AppProfile {
   reminders         Reminder[]
   corrections       EntryCorrection[]   @relation("CorrectionActor")
   auditLogs         AuditLog[]          @relation("AuditActor")
+  people            Person[]
+  categoryAliases   CategoryAlias[]
 }
 
 model Bucket {
@@ -151,6 +153,47 @@ model Reminder {
   linkedEntry  LedgerEntry?   @relation(fields: [linkedEntryId], references: [id], onDelete: SetNull)
 
   @@index([userId, status, dueAt])
+}
+
+model Person {
+  id                    String        @id @default(uuid()) @db.Uuid
+  userId                String        @db.Uuid
+  displayName           String
+  normalizedDisplayName String
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  user                  AppProfile    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aliases               PersonAlias[]
+
+  @@unique([userId, normalizedDisplayName])
+  @@index([userId, createdAt])
+}
+
+model PersonAlias {
+  id              String   @id @default(uuid()) @db.Uuid
+  personId        String   @db.Uuid
+  alias           String
+  normalizedAlias String
+  createdAt       DateTime @default(now())
+  person          Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, normalizedAlias])
+  @@index([normalizedAlias])
+}
+
+model CategoryAlias {
+  id                      String     @id @default(uuid()) @db.Uuid
+  userId                  String     @db.Uuid
+  canonicalName           String
+  normalizedCanonicalName String
+  alias                   String
+  normalizedAlias         String
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+  user                    AppProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, normalizedAlias])
+  @@index([userId, normalizedCanonicalName])
 }
 
 model AuditLog {

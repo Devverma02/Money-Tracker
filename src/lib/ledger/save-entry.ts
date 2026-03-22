@@ -5,6 +5,8 @@ import { createDuplicateFingerprintFromParsedAction } from "@/lib/ledger/duplica
 import { generateEntryNoteFromParsedAction } from "@/lib/ledger/entry-note";
 import { prisma } from "@/lib/prisma";
 import { toLedgerEntryType } from "@/lib/ledger/entry-types";
+import { resolveCategoryName } from "@/lib/categories/category-aliases";
+import { resolvePersonNameForAction } from "@/lib/persons/person-resolution";
 
 async function ensureBucketId(
   tx: Prisma.TransactionClient,
@@ -61,11 +63,19 @@ async function saveParsedActionWithTx(params: {
   user: User;
   action: ParsedAction;
   parserConfidence: number;
+  actionIndex: number;
 }) {
-  const { tx, user, action, parserConfidence } = params;
+  const { tx, user, action, parserConfidence, actionIndex } = params;
   const { ledgerEntryType, resolvedAmount, resolvedEntryDate } =
     validateParsedAction(action);
   const bucketId = await ensureBucketId(tx, user.id, action.bucket ?? "personal");
+  const resolvedPersonName = await resolvePersonNameForAction({
+    tx,
+    userId: user.id,
+    action,
+    actionIndex,
+  });
+  const resolvedCategory = await resolveCategoryName(user.id, action.category, tx);
   const duplicateFingerprint = createDuplicateFingerprintFromParsedAction(user.id, action);
   const generatedNote = await generateEntryNoteFromParsedAction(action);
 
@@ -91,9 +101,9 @@ async function saveParsedActionWithTx(params: {
       sourceText: action.sourceText,
       amount: new Prisma.Decimal(resolvedAmount),
       entryType: ledgerEntryType,
-      category: action.category,
+      category: resolvedCategory,
       entryDate: new Date(resolvedEntryDate),
-      personName: action.personName,
+      personName: resolvedPersonName,
       note: generatedNote,
       parserConfidence: new Prisma.Decimal(parserConfidence),
       requiresConfirmation: false,
@@ -152,6 +162,7 @@ export async function saveParsedEntries(params: {
         user,
         action,
         parserConfidence,
+        actionIndex: results.length,
       });
       results.push(result);
     }

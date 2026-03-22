@@ -69,6 +69,7 @@ function buildHistoryHref(params: {
   page?: number;
   type?: string;
   period?: string;
+  search?: string;
   basePath?: string;
   sectionId?: string;
 }) {
@@ -85,6 +86,10 @@ function buildHistoryHref(params: {
 
   if (params.period && params.period !== "all") {
     searchParams.set("period", params.period);
+  }
+
+  if (params.search) {
+    searchParams.set("search", params.search);
   }
 
   if (params.sectionId) {
@@ -107,6 +112,7 @@ export function HistoryWorkspace({
   const [isPending, startTransition] = useTransition();
   const [selectedType, setSelectedType] = useState(historyPageData.filters.entryType);
   const [selectedPeriod, setSelectedPeriod] = useState(historyPageData.filters.period);
+  const [searchQuery, setSearchQuery] = useState(historyPageData.filters.search ?? "");
 
   const openEntry = useMemo(
     () =>
@@ -120,6 +126,7 @@ export function HistoryWorkspace({
         page: 1,
         type: selectedType,
         period: selectedPeriod,
+        search: searchQuery,
         basePath,
         sectionId,
       }),
@@ -211,6 +218,14 @@ export function HistoryWorkspace({
         </div>
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") handleApplyFilters(); }}
+            placeholder="Search entries... (name, category, note)"
+            className="field rounded-lg text-sm sm:flex-1"
+          />
           <select
             value={selectedType}
             onChange={(event) => setSelectedType(event.target.value)}
@@ -313,6 +328,7 @@ export function HistoryWorkspace({
                 page: historyPageData.page - 1,
                 type: historyPageData.filters.entryType,
                 period: historyPageData.filters.period,
+                search: historyPageData.filters.search,
                 basePath,
                 sectionId,
               })}
@@ -328,6 +344,7 @@ export function HistoryWorkspace({
                 page: historyPageData.page + 1,
                 type: historyPageData.filters.entryType,
                 period: historyPageData.filters.period,
+                search: historyPageData.filters.search,
                 basePath,
                 sectionId,
               })}

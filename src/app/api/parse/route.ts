@@ -13,9 +13,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const json = (await request.json()) as unknown;
-  const payload = parseRequestSchema.parse(json);
-  const result = await parseMoneyInput(payload);
+  try {
+    const json = (await request.json()) as unknown;
+    const payload = parseRequestSchema.parse(json);
+    const result = await parseMoneyInput(payload);
 
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(
+      { error: "The parser is not available right now." },
+      { status: 500 },
+    );
+  }
 }

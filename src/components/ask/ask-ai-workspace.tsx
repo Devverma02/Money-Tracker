@@ -58,6 +58,10 @@ export function AskAiWorkspace({
   const resolveReplyLanguage = (text: string): AskAiReplyLanguage => {
     const detected = getVoiceReplyContext(text);
 
+    if (detected.mode === "english") {
+      return "english";
+    }
+
     if (detected.mode === "hindi") {
       return "hindi";
     }

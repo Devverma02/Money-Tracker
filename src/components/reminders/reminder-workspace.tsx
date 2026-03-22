@@ -21,6 +21,10 @@ type ReminderWorkspaceProps = {
   preferredLanguage: PreferredLanguageValue;
   voiceRepliesEnabled: boolean;
   defaultReminderTime: string;
+  alertsEnabled?: boolean;
+  notificationPermission?: NotificationPermission;
+  onEnableAlerts?: () => void | Promise<void>;
+  onDisableAlerts?: () => void;
   variant?: "dashboard" | "page";
 };
 
@@ -93,6 +97,10 @@ export function ReminderWorkspace({
   preferredLanguage,
   voiceRepliesEnabled,
   defaultReminderTime,
+  alertsEnabled = false,
+  notificationPermission = "default",
+  onEnableAlerts,
+  onDisableAlerts,
   variant = "page",
 }: ReminderWorkspaceProps) {
   const router = useRouter();
@@ -438,7 +446,24 @@ export function ReminderWorkspace({
               Create, track, and manage your follow-ups.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={alertsEnabled ? onDisableAlerts : onEnableAlerts}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              alertsEnabled
+                ? "bg-[#0d9488] text-white"
+                : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            {alertsEnabled ? "Browser alerts on" : "Enable browser alerts"}
+          </button>
         </div>
+
+        {notificationPermission === "denied" ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Browser notifications are blocked. Allow notifications in the browser to get reminder alerts.
+          </p>
+        ) : null}
 
         {error ? (
           <p className="status-danger mt-3 rounded-lg border px-3 py-2 text-sm">{error}</p>

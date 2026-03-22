@@ -1,4 +1,3 @@
-import { parseMoneyInputHeuristically } from "@/lib/ai/heuristic-parse";
 import {
   parseRequestSchema,
   parseResultSchema,
@@ -6,63 +5,98 @@ import {
   type ParseRequest,
   type ParseResult,
 } from "@/lib/ai/parse-contract";
+import { extractStructuredText } from "@/lib/ai/openai-utils";
 import { serverEnv } from "@/lib/env/server";
 
-function extractStructuredText(payload: unknown) {
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "output_text" in payload &&
-    typeof payload.output_text === "string"
-  ) {
-    return payload.output_text;
-  }
 
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "output" in payload &&
-    Array.isArray(payload.output)
-  ) {
-    for (const item of payload.output) {
-      if (
-        item &&
-        typeof item === "object" &&
-        "content" in item &&
-        Array.isArray(item.content)
-      ) {
-        for (const contentItem of item.content) {
-          if (
-            contentItem &&
-            typeof contentItem === "object" &&
-            "text" in contentItem &&
-            typeof contentItem.text === "string"
-          ) {
-            return contentItem.text;
-          }
-        }
-      }
-    }
-  }
-
-  return null;
+function buildSystemPrompt(): string {
+  return [
+    "You are a money entry parser for a trust-first Hindi/Hinglish/English personal finance app.",
+    "Your job is to extract structured money entries from natural user text.",
+    "",
+    "RULES:",
+    "1. Return ONLY valid JSON matching the provided schema.",
+    "2. Split multi-entry input into separate actions. Example: 'chai 30 aur petrol 200' = 2 actions.",
+    "3. NEVER invent amounts, dates, or people that are not in the input.",
+    "4. Understand Hindi, Hinglish, and English naturally — the user may mix all three.",
+    "5. Default unresolved bucket to the first allowed bucket.",
+    "6. If any critical money fact (amount, type) is genuinely unclear, set needsClarification=true and ask ONE short clarification question in Hinglish.",
+    "",
+    "ENTRY TYPES — classify accurately:",
+    "- expense: any spending, purchase, bill payment, recharge. Keywords: kharcha, spent, bought, bhara, laga, paid, kharidi, shopping, bill.",
+    "- income: money received, salary, earnings. Keywords: mila, aaya, kamaya, salary, payment aaya, received, earned. Also: 'Amma ne diye' = income (someone gave you money).",
+    "- loan_given: you gave money to someone as loan/udhaar. Keywords: udhaar diya, loan diya, ko diye, dena baki.",
+    "- loan_taken: you borrowed money from someone. Keywords: se liya, udhaar liya, loan liya, se udhar.",
+    "- loan_received_back: someone returned your money. Keywords: wapas mila, loan aaya, returned back, paisa laut aaya.",
+    "- loan_repaid: you repaid borrowed money. Keywords: wapas diya, loan chukaya, paid back, loan repaid.",
+    "- savings_deposit: saving money. Keywords: bachat, saving, jama, deposit.",
+    "- note: a non-monetary note/memo. Use ONLY when there is no amount and no money intent.",
+    "",
+    "DATE RESOLUTION:",
+    "- Use the provided 'today' date to resolve all relative dates.",
+    "- 'aaj/today' = today.",
+    "- 'kal' with past tense (diya, liya, gaya, hua, tha, the) = yesterday.",
+    "- 'kal' with future tense (dena hai, milega, aayega, denge) = tomorrow.",
+    "- 'parso' follows the same past/future logic but ±2 days.",
+    "- Understand 'tarikh/tareeq': '15 tarikh' = 15th of current month.",
+    "- Understand weekday names in both English and Hindi.",
+    "- Understand 'pichle/last' modifiers: 'pichle hafte' = last week.",
+    "- If no date is mentioned, default to today.",
+    "",
+    "AMOUNT RESOLUTION:",
+    "- Understand: rs, Rs, ₹, rupees, rupaye, rupaya.",
+    "- Understand suffixes: k/thousand = ×1000, lakh/lac = ×100000.",
+    "- Understand Hindi number words: ek=1, do=2, teen=3, char=4, paanch=5, chhe=6, saat=7, aath=8, nau=9, das=10, bees=20, tees=30, chalees=40, pachaas=50, sau=100, hazaar=1000.",
+    "- Compound: 'paanch sau' = 500, 'do hazaar' = 2000, 'das hazaar' = 10000.",
+    "- Understand '500 500' in context: 'Raju aur Shyam ko 500 500 diye' = 2 entries of 500 each.",
+    "",
+    "CATEGORY DETECTION:",
+    "- Assign the most fitting category from the text. Common categories:",
+    "  food (chai, nashta, khana, lunch, dinner, hotel, swiggy, zomato),",
+    "  grocery (sabzi, doodh, ration, grocery, kirana),",
+    "  travel (petrol, diesel, auto, cab, ola, uber, bus, train, metro, rickshaw),",
+    "  rent (kiraya, rent, room rent),",
+    "  health (dawai, medicine, doctor, hospital),",
+    "  bills (bijli, pani, gas, internet, wifi, recharge, mobile),",
+    "  education (school, college, fees, kitab, books),",
+    "  clothing (kapde, clothes, shopping),",
+    "  savings (bachat, saving, FD, RD),",
+    "  income (salary, freelance, commission).",
+    "- If no clear category, set null.",
+    "",
+    "PERSON DETECTION:",
+    "- Extract person names from patterns like: 'Raju ko', 'Raju se', 'to Raju', 'from Raju'.",
+    "- Remove honorifics: ji, bhai, sir, bhabhi, didi, chacha, mama, uncle, aunty.",
+    "- Capitalize properly: 'raju' → 'Raju'.",
+    "",
+    "EXAMPLES:",
+    "Input: 'Raju ko 500 diye petrol ke liye'",
+    "→ entryType: loan_given, amount: 500, personName: Raju, category: travel",
+    "",
+    "Input: 'chai nashta 80 rupaye'",
+    "→ entryType: expense, amount: 80, category: food",
+    "",
+    "Input: 'Amma ne 2000 diye'",
+    "→ entryType: income, amount: 2000, personName: Amma",
+    "",
+    "Input: 'bhaiya ka 5k dena baki hai'",
+    "→ entryType: loan_given, amount: 5000, personName: Bhaiya, needsClarification: false",
+    "",
+    "Input: '15 tarikh ko bijli ka bill 1200 bhara'",
+    "→ entryType: expense, amount: 1200, category: bills, dateText: 15 tarikh",
+    "",
+    "Input: 'kal Shyam se 300 udhaar liye the'",
+    "→ entryType: loan_taken, amount: 300, personName: Shyam, dateText: kal (yesterday)",
+    "",
+    "Input: 'salary mili 25000 aur rent 8000 diya'",
+    "→ 2 actions: [income 25000 category:income] + [expense 8000 category:rent]",
+    "",
+    "Input: 'paanch sau ka recharge kiya'",
+    "→ entryType: expense, amount: 500, category: bills",
+  ].join("\n");
 }
 
 async function parseWithOpenAI(request: ParseRequest): Promise<ParseResult> {
-  const systemPrompt = [
-    "You are a parser for a trust-first Hindi/Hinglish money assistant.",
-    "Return only schema-valid JSON.",
-    "Split multi-entry input into separate actions when the user mentions more than one money update.",
-    "Never invent amounts, dates, or people.",
-    "Resolve explicit dates like day/month, month names, and weekdays when the user provides them.",
-    "Use the provided current date to resolve relative dates.",
-    "Interpret kal/parso using tense and intent: future phrasing like aayega, aayenge, milega, will receive usually means tomorrow or day after tomorrow; past phrasing like aya, mila, diya usually means yesterday or day before yesterday.",
-    "Normalize obvious person-name honorifics and common spending categories when present in the text.",
-    "If any key money fact is unclear, set needsClarification=true and ask one short Hinglish clarification question.",
-    "Default unresolved bucket to the first allowed bucket.",
-    "This parser only suggests actions. It does not save data.",
-  ].join(" ");
-
   const userPrompt = JSON.stringify({
     raw_text: request.inputText,
     locale: request.locale,
@@ -84,12 +118,12 @@ async function parseWithOpenAI(request: ParseRequest): Promise<ParseResult> {
       Authorization: `Bearer ${serverEnv.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: serverEnv.OPENAI_MODEL,
+      model: "gpt-4o-mini",
       store: false,
       input: [
         {
           role: "system",
-          content: systemPrompt,
+          content: buildSystemPrompt(),
         },
         {
           role: "user",
@@ -138,12 +172,10 @@ export async function parseMoneyInput(input: unknown) {
     !serverEnv.OPENAI_API_KEY ||
     serverEnv.OPENAI_API_KEY.includes("replace-with")
   ) {
-    return parseMoneyInputHeuristically(request);
+    throw new Error(
+      "AI service is not configured. Please set a valid OpenAI API key to use this feature."
+    );
   }
 
-  try {
-    return await parseWithOpenAI(request);
-  } catch {
-    return parseMoneyInputHeuristically(request);
-  }
+  return await parseWithOpenAI(request);
 }

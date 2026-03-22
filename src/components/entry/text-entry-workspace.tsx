@@ -4,12 +4,17 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { ParsePreviewCard } from "@/components/entry/parse-preview-card";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ParseResult, ParsedAction } from "@/lib/ai/parse-contract";
-import type { SaveEntryResponse } from "@/lib/ledger/save-contract";
+import type {
+  PersonConflict,
+  SaveEntryConflictResponse,
+  SaveEntryResponse,
+} from "@/lib/ledger/save-contract";
 import {
   getSpeechLocaleForLanguage,
   type EntryInputPreferenceValue,
   type PreferredLanguageValue,
 } from "@/lib/settings/settings-contract";
+import type { RecurringSuggestion } from "@/lib/summaries/types";
 import { getVoiceReplyContext, voiceText, type VoiceReplyContext } from "@/lib/voice/voice-localization";
 
 type TextEntryWorkspaceProps = {
@@ -18,6 +23,9 @@ type TextEntryWorkspaceProps = {
   preferredLanguage: PreferredLanguageValue;
   voiceRepliesEnabled: boolean;
   initialInputMode: EntryInputPreferenceValue;
+  recurringSuggestions?: RecurringSuggestion[];
+  initialDraftSeed?: string | null;
+  onDraftSeedConsumed?: () => void;
 };
 
 type EntryInputMode = "mic" | "typing";
@@ -80,6 +88,9 @@ export function TextEntryWorkspace({
   preferredLanguage,
   voiceRepliesEnabled,
   initialInputMode,
+  recurringSuggestions = [],
+  initialDraftSeed = null,
+  onDraftSeedConsumed,
 }: TextEntryWorkspaceProps) {
   const [inputText, setInputText] = useState("");
   const [result, setResult] = useState<ParseResult | null>(null);
@@ -88,6 +99,7 @@ export function TextEntryWorkspace({
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
+  const [personConflicts, setPersonConflicts] = useState<Record<number, PersonConflict>>({});
   const [voiceReplyContext, setVoiceReplyContext] = useState<VoiceReplyContext>({
     mode: "english",
     speechLang: "en-IN",
@@ -105,6 +117,16 @@ export function TextEntryWorkspace({
     setSelectedIndexes(getReadyActionIndexes(result));
   }, [result]);
 
+  useEffect(() => {
+    if (!initialDraftSeed) {
+      return;
+    }
+
+    setEntryInputMode("typing");
+    setInputText(initialDraftSeed);
+    onDraftSeedConsumed?.();
+  }, [initialDraftSeed, onDraftSeedConsumed]);
+
   const readyIndexes = useMemo(() => getReadyActionIndexes(result), [result]);
   const readyCount = readyIndexes.length;
   const selectedReadyIndexes = selectedIndexes.filter((index) =>
@@ -113,7 +135,24 @@ export function TextEntryWorkspace({
   const selectedActions =
     result?.actions.filter((_, index) => selectedReadyIndexes.includes(index)) ?? [];
   const blockedCount = result ? result.actions.length - readyCount : 0;
-  const canSave = selectedActions.length > 0 && !isParsing && !isSaving;
+  const selectedConflictIndexes = selectedReadyIndexes.filter((index) => {
+    const conflict = personConflicts[index];
+    if (!conflict) {
+      return false;
+    }
+
+    const action = result?.actions[index];
+    if (!action) {
+      return true;
+    }
+
+    return !action.resolvedPersonId && !action.createPersonLabel;
+  });
+  const canSave =
+    selectedActions.length > 0 &&
+    selectedConflictIndexes.length === 0 &&
+    !isParsing &&
+    !isSaving;
 
   const buildVoiceReply = (parseResult: ParseResult, context: VoiceReplyContext) => {
     const readyItems = parseResult.actions.filter(isActionReady).length;
@@ -297,6 +336,7 @@ export function TextEntryWorkspace({
       setSaveMessage(null);
       setDuplicateMessage(null);
       setVoiceMessage(null);
+      setPersonConflicts({});
       setLastInputMode(source);
 
       try {
@@ -395,6 +435,75 @@ export function TextEntryWorkspace({
     );
   };
 
+  const handleActionUpdate = (actionIndex: number, updated: ParsedAction) => {
+    if (!result) {
+      return;
+    }
+
+    const updatedActions = result.actions.map((existing, idx) =>
+      idx === actionIndex ? updated : existing,
+    );
+    const nextSummary = buildResultSummary(updatedActions);
+    setResult({
+      ...result,
+      actions: updatedActions,
+      ...nextSummary,
+    });
+    setPersonConflicts((current) => {
+      if (!(actionIndex in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[actionIndex];
+      return next;
+    });
+  };
+
+  const handleResolvePersonConflict = (
+    actionIndex: number,
+    resolution:
+      | {
+          mode: "existing";
+          personId: string;
+        }
+      | {
+          mode: "create";
+          label: string;
+        },
+  ) => {
+    if (!result) {
+      return;
+    }
+
+    const updatedActions = result.actions.map((existing, idx) => {
+      if (idx !== actionIndex) {
+        return existing;
+      }
+
+      if (resolution.mode === "existing") {
+        return {
+          ...existing,
+          resolvedPersonId: resolution.personId,
+          createPersonLabel: null,
+        };
+      }
+
+      return {
+        ...existing,
+        resolvedPersonId: null,
+        createPersonLabel: resolution.label,
+      };
+    });
+
+    const nextSummary = buildResultSummary(updatedActions);
+    setResult({
+      ...result,
+      actions: updatedActions,
+      ...nextSummary,
+    });
+  };
+
   const handleSave = () => {
     if (!result || !canSave) {
       return;
@@ -404,6 +513,7 @@ export function TextEntryWorkspace({
       setError(null);
       setSaveMessage(null);
       setDuplicateMessage(null);
+      setPersonConflicts({});
 
       try {
         const response = await fetch("/api/entries", {
@@ -418,7 +528,22 @@ export function TextEntryWorkspace({
           }),
         });
 
-        const payload = (await response.json()) as SaveEntryResponse | { error?: string };
+        const payload = (await response.json()) as
+          | SaveEntryResponse
+          | SaveEntryConflictResponse
+          | { error?: string };
+
+        if (response.status === 409) {
+          if (!("conflicts" in payload) || !Array.isArray(payload.conflicts)) {
+            throw new Error("The save response was invalid.");
+          }
+
+          const nextConflicts = Object.fromEntries(
+            payload.conflicts.map((conflict) => [conflict.actionIndex, conflict]),
+          );
+          setPersonConflicts(nextConflicts);
+          throw new Error(payload.message);
+        }
 
         if (!response.ok) {
           throw new Error(
@@ -432,6 +557,7 @@ export function TextEntryWorkspace({
           throw new Error("The save response was invalid.");
         }
 
+        setPersonConflicts({});
         setSaveMessage(payload.message);
         setDuplicateMessage(
           payload.duplicateWarningCount > 0
@@ -470,6 +596,7 @@ export function TextEntryWorkspace({
           setResult(null);
           setAwaitingVoiceClarification(false);
           setVoiceConversationText("");
+          setPersonConflicts({});
           return;
         }
 
@@ -529,12 +656,29 @@ export function TextEntryWorkspace({
         </div>
 
         {entryInputMode === "typing" ? (
-          <textarea
-            value={inputText}
-            onChange={(event) => setInputText(event.target.value)}
-            placeholder="Type here"
-            className="field mt-4 min-h-32 resize-none rounded-lg"
-          />
+          <>
+            <textarea
+              value={inputText}
+              onChange={(event) => setInputText(event.target.value)}
+              placeholder="Type here"
+              className="field mt-4 min-h-32 resize-none rounded-lg"
+            />
+
+            {recurringSuggestions.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {recurringSuggestions.slice(0, 4).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setInputText(item.suggestedText)}
+                    className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-[#0d9488] hover:text-[#0d9488]"
+                  >
+                    {item.title}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         {entryInputMode === "mic" ? (
@@ -661,6 +805,17 @@ export function TextEntryWorkspace({
                 </div>
               )}
 
+              {selectedConflictIndexes.length > 0 ? (
+                <div className="status-warn rounded-lg border px-3 py-2 text-sm">
+                  <p className="font-medium">Person name needs confirmation</p>
+                  <p className="mt-0.5 text-xs">
+                    {selectedConflictIndexes.length === 1
+                      ? "One selected entry matches multiple people. Choose the right person or create a new label before saving."
+                      : `${selectedConflictIndexes.length} selected entries match multiple people. Resolve them before saving.`}
+                  </p>
+                </div>
+              ) : null}
+
               {readyCount > 1 ? (
                 <div className="flex flex-wrap gap-1.5">
                   <button
@@ -694,7 +849,10 @@ export function TextEntryWorkspace({
               isReadyToSave={ready}
               canSelect={ready}
               isSelected={selectedIndexes.includes(index)}
+              personConflict={personConflicts[index] ?? null}
               onToggleSelect={() => handleToggleSelect(index)}
+              onActionUpdate={handleActionUpdate}
+              onResolvePersonConflict={handleResolvePersonConflict}
             />
           );
         })}

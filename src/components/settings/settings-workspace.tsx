@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
   EntryInputPreferenceValue,
@@ -10,6 +10,12 @@ import type {
 
 type SettingsWorkspaceProps = {
   settings: SettingsResponse;
+};
+
+type CategoryGroup = {
+  canonicalName: string;
+  aliases: string[];
+  entryCount: number;
 };
 
 const timezoneOptions = [
@@ -37,7 +43,38 @@ export function SettingsWorkspace({ settings }: SettingsWorkspaceProps) {
     useState<EntryInputPreferenceValue>(settings.preferredEntryInput);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
+  const [sourceCategory, setSourceCategory] = useState("");
+  const [targetCategory, setTargetCategory] = useState("");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categorySuccess, setCategorySuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isCategoryPending, startCategoryTransition] = useTransition();
+
+  const loadCategoryGroups = async () => {
+    const response = await fetch("/api/categories");
+    const payload = (await response.json()) as
+      | { groups: CategoryGroup[] }
+      | { error?: string };
+
+    if (!response.ok) {
+      throw new Error(
+        "error" in payload && payload.error
+          ? payload.error
+          : "The category list could not be loaded.",
+      );
+    }
+
+    if ("groups" in payload) {
+      setCategoryGroups(payload.groups);
+      setSourceCategory((current) =>
+        current || !payload.groups[0] ? current : payload.groups[0].canonicalName,
+      );
+      setTargetCategory((current) =>
+        current || !payload.groups[1] ? current : payload.groups[1].canonicalName,
+      );
+    }
+  };
 
   const timezoneChoices = useMemo(() => {
     if (timezoneOptions.includes(settings.timezone)) {
@@ -46,6 +83,16 @@ export function SettingsWorkspace({ settings }: SettingsWorkspaceProps) {
 
     return [settings.timezone, ...timezoneOptions];
   }, [settings.timezone]);
+
+  useEffect(() => {
+    startCategoryTransition(async () => {
+      try {
+        await loadCategoryGroups();
+      } catch {
+        setCategoryError("The category list could not be loaded.");
+      }
+    });
+  }, []);
 
   const handleSave = () => {
     startTransition(async () => {
@@ -87,6 +134,52 @@ export function SettingsWorkspace({ settings }: SettingsWorkspaceProps) {
           caughtError instanceof Error
             ? caughtError.message
             : "The settings could not be saved.",
+        );
+      }
+    });
+  };
+
+  const handleMergeCategories = () => {
+    startCategoryTransition(async () => {
+      setCategoryError(null);
+      setCategorySuccess(null);
+
+      try {
+        const response = await fetch("/api/categories", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sourceCategory,
+            targetCategory,
+          }),
+        });
+
+        const payload = (await response.json()) as
+          | { ok: true; message: string }
+          | { error?: string };
+
+        if (!response.ok) {
+          throw new Error(
+            "error" in payload && payload.error
+              ? payload.error
+              : "The category merge could not be saved.",
+          );
+        }
+
+        if (!("message" in payload)) {
+          throw new Error("The category merge could not be saved.");
+        }
+
+        setCategorySuccess(payload.message);
+        await loadCategoryGroups();
+        router.refresh();
+      } catch (caughtError) {
+        setCategoryError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The category merge could not be saved.",
         );
       }
     });
@@ -260,6 +353,90 @@ export function SettingsWorkspace({ settings }: SettingsWorkspaceProps) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-semibold text-gray-900">Category merges</h3>
+          <p className="text-sm text-gray-500">
+            Combine similar categories like home items, home accessories, and ghar ka saman.
+          </p>
+        </div>
+
+        {categoryError ? (
+          <p className="status-danger mt-4 rounded-lg border px-3 py-2 text-sm">{categoryError}</p>
+        ) : null}
+
+        {categorySuccess ? (
+          <p className="status-positive mt-4 rounded-lg border px-3 py-2 text-sm">{categorySuccess}</p>
+        ) : null}
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-600">From</label>
+            <select
+              value={sourceCategory}
+              onChange={(event) => setSourceCategory(event.target.value)}
+              className="field"
+            >
+              {categoryGroups.map((group) => (
+                <option key={`source-${group.canonicalName}`} value={group.canonicalName}>
+                  {group.canonicalName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-600">Into</label>
+            <select
+              value={targetCategory}
+              onChange={(event) => setTargetCategory(event.target.value)}
+              className="field"
+            >
+              {categoryGroups.map((group) => (
+                <option key={`target-${group.canonicalName}`} value={group.canonicalName}>
+                  {group.canonicalName}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={handleMergeCategories}
+              disabled={
+                isCategoryPending ||
+                !sourceCategory ||
+                !targetCategory ||
+                sourceCategory === targetCategory
+              }
+              className="secondary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isCategoryPending ? "Merging..." : "Merge"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-2">
+          {categoryGroups.slice(0, 8).map((group) => (
+            <div key={group.canonicalName} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+              <p className="text-sm font-semibold text-gray-900">{group.canonicalName}</p>
+              <p className="mt-1 text-xs text-gray-500">{group.entryCount} entries</p>
+              {group.aliases.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {group.aliases.map((alias) => (
+                    <span
+                      key={`${group.canonicalName}-${alias}`}
+                      className="rounded-full border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-500"
+                    >
+                      {alias}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
         </div>
       </div>
 

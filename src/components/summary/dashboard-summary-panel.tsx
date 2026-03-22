@@ -7,7 +7,7 @@ type DashboardSummaryPanelProps = {
 };
 
 function formatCurrency(amount: number) {
-  return `₹${amount.toLocaleString("en-IN")}`;
+  return `Rs ${amount.toLocaleString("en-IN")}`;
 }
 
 export function DashboardSummaryPanel({
@@ -47,20 +47,73 @@ export function DashboardSummaryPanel({
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
           <article key={card.label} className="rounded-xl border border-gray-200 bg-white p-4">
-            <p className="text-xs font-medium text-gray-400">
-              {card.label}
-            </p>
-            <p className="mt-2 font-mono text-2xl font-bold text-gray-900">
-              {card.amount}
-            </p>
+            <p className="text-xs font-medium text-gray-400">{card.label}</p>
+            <p className="mt-2 font-mono text-2xl font-bold text-gray-900">{card.amount}</p>
             <p className="mt-1.5 text-sm text-gray-500">{card.helper}</p>
           </article>
         ))}
       </div>
 
+      <section className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-semibold text-gray-900">Monthly report</h3>
+          <p className="text-sm text-gray-500">A simple view for this month.</p>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+            <p className="text-xs font-medium text-emerald-500">Kitna aaya</p>
+            <p className="mt-2 font-mono text-2xl font-bold text-emerald-700">
+              {formatCurrency(summary.monthlyReport.cashInTotal)}
+            </p>
+          </article>
+
+          <article className="rounded-lg border border-red-100 bg-red-50 p-4">
+            <p className="text-xs font-medium text-red-500">Kitna gaya</p>
+            <p className="mt-2 font-mono text-2xl font-bold text-red-700">
+              {formatCurrency(summary.monthlyReport.cashOutTotal)}
+            </p>
+          </article>
+
+          <article className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-xs font-medium text-gray-400">Top category</p>
+            <p className="mt-2 text-base font-semibold text-gray-900">
+              {summary.monthlyReport.topSpendingCategory?.category ?? "Not enough data"}
+            </p>
+            {summary.monthlyReport.topSpendingCategory ? (
+              <p className="mt-1 text-sm text-gray-500">
+                {formatCurrency(summary.monthlyReport.topSpendingCategory.amount)}
+              </p>
+            ) : null}
+          </article>
+
+          <article className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-xs font-medium text-gray-400">Lena / dena baki</p>
+            <div className="mt-2 space-y-1.5 text-sm text-gray-600">
+              <p>
+                Receive:{" "}
+                <span className="font-semibold text-gray-900">
+                  {summary.monthlyReport.topReceivablePerson
+                    ? `${summary.monthlyReport.topReceivablePerson.personName} (${formatCurrency(summary.monthlyReport.topReceivablePerson.receivable)})`
+                    : "None"}
+                </span>
+              </p>
+              <p>
+                Pay:{" "}
+                <span className="font-semibold text-gray-900">
+                  {summary.monthlyReport.topPayablePerson
+                    ? `${summary.monthlyReport.topPayablePerson.personName} (${formatCurrency(summary.monthlyReport.topPayablePerson.payable)})`
+                    : "None"}
+                </span>
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <details className="rounded-xl border border-gray-200 bg-white p-4">
         <summary className="cursor-pointer list-none text-sm font-semibold text-gray-900">
-          Show more details ↓
+          Show more details
         </summary>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -94,13 +147,14 @@ export function DashboardSummaryPanel({
             <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
               Insight
             </p>
-            <p className="mt-3 text-sm leading-6 text-gray-700">
-              {summary.insightText}
-            </p>
+            <p className="mt-3 text-sm leading-6 text-gray-700">{summary.insightText}</p>
             <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-500">
               {summary.topSpendingCategory ? (
                 <p>
-                  Top spending: <span className="font-semibold text-gray-900">{summary.topSpendingCategory.category}</span>{" "}
+                  Top spending:{" "}
+                  <span className="font-semibold text-gray-900">
+                    {summary.topSpendingCategory.category}
+                  </span>{" "}
                   at {formatCurrency(summary.topSpendingCategory.amount)}.
                 </p>
               ) : (

@@ -31,6 +31,8 @@ export const parsedActionSchema = z.object({
   dateText: z.string().nullable(),
   resolvedDate: z.string().nullable(),
   sourceText: z.string().min(1),
+  resolvedPersonId: z.string().uuid().nullable().optional(),
+  createPersonLabel: z.string().trim().min(2).max(80).nullable().optional(),
 });
 
 export const parseResultSchema = z.object({

@@ -5,13 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AskAiWorkspace } from "@/components/ask/ask-ai-workspace";
 import { TextEntryWorkspace } from "@/components/entry/text-entry-workspace";
 import { HistoryWorkspace } from "@/components/history/history-workspace";
+import { PersonLedgerWorkspace } from "@/components/persons/person-ledger-workspace";
 import { ReminderWorkspace } from "@/components/reminders/reminder-workspace";
 import { SettingsWorkspace } from "@/components/settings/settings-workspace";
+import { OverviewCharts } from "@/components/summary/overview-charts";
+import { useReminderAlerts } from "@/hooks/use-reminder-alerts";
 import type { SettingsResponse } from "@/lib/settings/settings-contract";
 import { DashboardSummaryPanel } from "@/components/summary/dashboard-summary-panel";
 import type { HistoryPageData } from "@/lib/ledger/history-types";
 import type { ReminderBoard } from "@/lib/reminders/types";
-import type { DashboardSummary } from "@/lib/summaries/types";
+import type { DashboardSummary, RecurringSuggestion } from "@/lib/summaries/types";
 
 type DashboardWorkspaceProps = {
   timezone: string;
@@ -19,6 +22,7 @@ type DashboardWorkspaceProps = {
   summary: DashboardSummary;
   reminders: ReminderBoard;
   historyPageData: HistoryPageData;
+  recurringSuggestions: RecurringSuggestion[];
   initialSection?: DashboardSectionId;
 };
 
@@ -27,6 +31,7 @@ type DashboardSectionId =
   | "entry"
   | "reminders"
   | "history"
+  | "persons"
   | "ask-ai"
   | "settings";
 
@@ -85,6 +90,18 @@ const dashboardSections: DashboardSection[] = [
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
         <path d="M12 6v6l4 2.25M21 12a9 9 0 11-3.16-6.87M21 3v6h-6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "persons",
+    label: "Udhaar Book",
+    shortLabel: "UB",
+    title: "Udhaar Book",
+    description: "Track person-wise balances — who owes what, all in one place.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
+        <path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -161,16 +178,20 @@ function SidebarNav({
 
 /* ── Overview section ── */
 function OverviewSection({
+  timezone,
   summary,
   reminders,
+  recurringSuggestions,
   onOpenSection,
+  onUseRecurringSuggestion,
 }: {
+  timezone: string;
   summary: DashboardSummary;
   reminders: ReminderBoard;
+  recurringSuggestions: RecurringSuggestion[];
   onOpenSection: (sectionId: DashboardSectionId) => void;
+  onUseRecurringSuggestion: (suggestedText: string) => void;
 }) {
-  const statCards: Array<{ label: string; value: string; sub: string }> = [];
-
   return (
     <div className="space-y-4">
       <DashboardSummaryPanel
@@ -179,26 +200,45 @@ function OverviewSection({
         overdueReminderCount={reminders.counts.overdue}
       />
 
-      {/* Welcome */}
-      <section className="hidden rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-xl font-bold text-gray-900">
-          Hello there
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Use the sidebar to jump between entry, reminders, history, and Ask AI.
-        </p>
-      </section>
+      <OverviewCharts timezone={timezone} />
 
-      {/* Stats */}
-      <section className="hidden grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card) => (
-          <article key={card.label} className="rounded-xl border border-gray-200 bg-white p-4">
-            <p className="text-xs font-medium text-gray-400">{card.label}</p>
-            <p className="mt-2 font-mono text-xl font-bold text-gray-900">{card.value}</p>
-            <p className="mt-1 text-xs text-gray-400">{card.sub}</p>
-          </article>
-        ))}
-      </section>
+      {recurringSuggestions.length > 0 ? (
+        <section className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Recurring suggestions</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Frequent monthly items detected from your saved history.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenSection("entry")}
+              className="secondary-button rounded-lg px-3 py-2 text-sm font-semibold"
+            >
+              Open entry
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {recurringSuggestions.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onUseRecurringSuggestion(item.suggestedText)}
+                className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-[#0d9488] hover:bg-white"
+              >
+                <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                <p className="mt-1 text-sm text-gray-500">{item.suggestedText}</p>
+                <p className="mt-2 text-xs text-gray-400">
+                  Seen across {item.patternMonths} months
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
 
       {/* Jump-to + Next reminder */}
       <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -270,6 +310,7 @@ export function DashboardWorkspace({
   summary,
   reminders,
   historyPageData,
+  recurringSuggestions,
   initialSection = "overview",
 }: DashboardWorkspaceProps) {
   const router = useRouter();
@@ -277,7 +318,11 @@ export function DashboardWorkspace({
   const [activeSection, setActiveSection] = useState<DashboardSectionId>(initialSection);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [entryDraftSeed, setEntryDraftSeed] = useState<string | null>(null);
   const activeSectionMeta = findSection(activeSection);
+  const reminderAlerts = useReminderAlerts({
+    timezone,
+  });
 
   useEffect(() => {
     setActiveSection(initialSection);
@@ -303,6 +348,11 @@ export function DashboardWorkspace({
 
     const query = params.toString();
     router.push(query ? `/dashboard?${query}` : "/dashboard");
+  };
+
+  const handleUseRecurringSuggestion = (suggestedText: string) => {
+    setEntryDraftSeed(suggestedText);
+    openSection("entry");
   };
 
   return (
@@ -421,9 +471,12 @@ export function DashboardWorkspace({
         {/* Active section content */}
         {activeSection === "overview" ? (
           <OverviewSection
+            timezone={timezone}
             summary={summary}
             reminders={reminders}
+            recurringSuggestions={recurringSuggestions}
             onOpenSection={openSection}
+            onUseRecurringSuggestion={handleUseRecurringSuggestion}
           />
         ) : null}
 
@@ -434,6 +487,9 @@ export function DashboardWorkspace({
             preferredLanguage={settings.preferredLanguage}
             voiceRepliesEnabled={settings.voiceRepliesEnabled}
             initialInputMode={settings.preferredEntryInput}
+            recurringSuggestions={recurringSuggestions}
+            initialDraftSeed={entryDraftSeed}
+            onDraftSeedConsumed={() => setEntryDraftSeed(null)}
           />
         ) : null}
 
@@ -445,6 +501,10 @@ export function DashboardWorkspace({
             preferredLanguage={settings.preferredLanguage}
             voiceRepliesEnabled={settings.voiceRepliesEnabled}
             defaultReminderTime={settings.reminderDefaultTime}
+            alertsEnabled={reminderAlerts.enabled}
+            notificationPermission={reminderAlerts.permission}
+            onEnableAlerts={reminderAlerts.enableAlerts}
+            onDisableAlerts={reminderAlerts.disableAlerts}
             variant="page"
           />
         ) : null}
@@ -455,6 +515,10 @@ export function DashboardWorkspace({
             basePath="/dashboard"
             sectionId="history"
           />
+        ) : null}
+
+        {activeSection === "persons" ? (
+          <PersonLedgerWorkspace />
         ) : null}
 
         {activeSection === "ask-ai" ? (

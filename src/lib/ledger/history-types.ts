@@ -19,6 +19,7 @@ export type HistoryFilters = {
   pageSize: number;
   entryType: string;
   period: HistoryFilterPeriod;
+  search: string;
 };
 
 export type HistoryPageData = {

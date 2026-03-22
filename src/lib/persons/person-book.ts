@@ -1,0 +1,531 @@
+import { EntryType } from "@prisma/client";
+import { prisma as prismaClient } from "@/lib/prisma";
+import { normalizePersonLookup } from "@/lib/persons/person-resolution";
+
+export type PersonSummary = {
+  personId: string;
+  personName: string;
+  aliases: string[];
+  totalGiven: number;
+  totalReceivedBack: number;
+  totalTaken: number;
+  totalRepaid: number;
+  netReceivable: number;
+  netPayable: number;
+  transactionCount: number;
+  lastTransactionDate: string;
+};
+
+export type PersonTransaction = {
+  id: string;
+  amount: number;
+  entryType: string;
+  category: string | null;
+  note: string | null;
+  entryDate: string;
+  sourceText: string | null;
+  createdAt: string;
+};
+
+export type PersonDetail = {
+  personId: string;
+  personName: string;
+  aliases: string[];
+  summary: {
+    totalGiven: number;
+    totalReceivedBack: number;
+    totalTaken: number;
+    totalRepaid: number;
+    otherAmount: number;
+    netReceivable: number;
+    netPayable: number;
+    transactionCount: number;
+  };
+  transactions: PersonTransaction[];
+};
+
+type PersonRecord = {
+  id: string;
+  displayName: string;
+  aliases: string[];
+};
+
+function buildNameSet(person: PersonRecord) {
+  return new Set(
+    [person.displayName, ...person.aliases]
+      .map((value) => normalizePersonLookup(value))
+      .filter(Boolean),
+  );
+}
+
+async function loadPeople(userId: string) {
+  const people = await prismaClient.person.findMany({
+    where: {
+      userId,
+    },
+    select: {
+      id: true,
+      displayName: true,
+      aliases: {
+        select: {
+          alias: true,
+        },
+        orderBy: {
+          alias: "asc",
+        },
+      },
+    },
+    orderBy: {
+      displayName: "asc",
+    },
+  });
+
+  return people.map((person) => ({
+    id: person.id,
+    displayName: person.displayName,
+    aliases: person.aliases.map((alias) => alias.alias),
+  })) satisfies PersonRecord[];
+}
+
+async function loadEntriesByName(userId: string) {
+  const entries = await prismaClient.ledgerEntry.findMany({
+    where: {
+      userId,
+      personName: {
+        not: null,
+      },
+    },
+    select: {
+      id: true,
+      amount: true,
+      entryType: true,
+      category: true,
+      note: true,
+      entryDate: true,
+      sourceText: true,
+      createdAt: true,
+      personName: true,
+    },
+    orderBy: {
+      entryDate: "desc",
+    },
+  });
+
+  return entries;
+}
+
+function mapEntriesToPeople(people: PersonRecord[], entries: Awaited<ReturnType<typeof loadEntriesByName>>) {
+  const normalizedToPerson = new Map<string, PersonRecord>();
+
+  for (const person of people) {
+    for (const name of buildNameSet(person)) {
+      normalizedToPerson.set(name, person);
+    }
+  }
+
+  const grouped = new Map<string, typeof entries>();
+
+  for (const entry of entries) {
+    const normalizedName = normalizePersonLookup(entry.personName ?? "");
+    const person = normalizedToPerson.get(normalizedName);
+
+    if (!person) {
+      continue;
+    }
+
+    const current = grouped.get(person.id) ?? [];
+    current.push(entry);
+    grouped.set(person.id, current);
+  }
+
+  return grouped;
+}
+
+export async function getPersonList(userId: string) {
+  const [people, entries] = await Promise.all([loadPeople(userId), loadEntriesByName(userId)]);
+  const grouped = mapEntriesToPeople(people, entries);
+
+  const summaries = people.map((person) => {
+    const personEntries = grouped.get(person.id) ?? [];
+    let totalGiven = 0;
+    let totalReceivedBack = 0;
+    let totalTaken = 0;
+    let totalRepaid = 0;
+
+    for (const entry of personEntries) {
+      const amount = entry.amount.toNumber();
+
+      if (entry.entryType === EntryType.LOAN_GIVEN) {
+        totalGiven += amount;
+      } else if (entry.entryType === EntryType.LOAN_RECEIVED_BACK) {
+        totalReceivedBack += amount;
+      } else if (entry.entryType === EntryType.LOAN_TAKEN) {
+        totalTaken += amount;
+      } else if (entry.entryType === EntryType.LOAN_REPAID) {
+        totalRepaid += amount;
+      }
+    }
+
+    const latestDate = personEntries[0]?.entryDate ?? null;
+
+    return {
+      personId: person.id,
+      personName: person.displayName,
+      aliases: person.aliases.filter(
+        (alias) => normalizePersonLookup(alias) !== normalizePersonLookup(person.displayName),
+      ),
+      totalGiven,
+      totalReceivedBack,
+      totalTaken,
+      totalRepaid,
+      netReceivable: Math.max(totalGiven - totalReceivedBack, 0),
+      netPayable: Math.max(totalTaken - totalRepaid, 0),
+      transactionCount: personEntries.length,
+      lastTransactionDate: latestDate ? latestDate.toISOString() : new Date(0).toISOString(),
+    } satisfies PersonSummary;
+  });
+
+  return summaries
+    .filter((person) => person.transactionCount > 0)
+    .sort((a, b) => b.netReceivable + b.netPayable - (a.netReceivable + a.netPayable));
+}
+
+export async function getPersonDetail(userId: string, personId: string) {
+  const [people, entries] = await Promise.all([loadPeople(userId), loadEntriesByName(userId)]);
+  const person = people.find((item) => item.id === personId);
+
+  if (!person) {
+    throw new Error("The person could not be found.");
+  }
+
+  const grouped = mapEntriesToPeople(people, entries);
+  const personEntries = grouped.get(person.id) ?? [];
+
+  let totalGiven = 0;
+  let totalReceivedBack = 0;
+  let totalTaken = 0;
+  let totalRepaid = 0;
+  let otherAmount = 0;
+
+  const transactions: PersonTransaction[] = personEntries.map((entry) => {
+    const amount = entry.amount.toNumber();
+
+    if (entry.entryType === EntryType.LOAN_GIVEN) {
+      totalGiven += amount;
+    } else if (entry.entryType === EntryType.LOAN_RECEIVED_BACK) {
+      totalReceivedBack += amount;
+    } else if (entry.entryType === EntryType.LOAN_TAKEN) {
+      totalTaken += amount;
+    } else if (entry.entryType === EntryType.LOAN_REPAID) {
+      totalRepaid += amount;
+    } else {
+      otherAmount += amount;
+    }
+
+    return {
+      id: entry.id,
+      amount,
+      entryType: entry.entryType,
+      category: entry.category,
+      note: entry.note,
+      entryDate: entry.entryDate.toISOString(),
+      sourceText: entry.sourceText,
+      createdAt: entry.createdAt.toISOString(),
+    };
+  });
+
+  return {
+    personId: person.id,
+    personName: person.displayName,
+    aliases: person.aliases.filter(
+      (alias) => normalizePersonLookup(alias) !== normalizePersonLookup(person.displayName),
+    ),
+    summary: {
+      totalGiven,
+      totalReceivedBack,
+      totalTaken,
+      totalRepaid,
+      otherAmount,
+      netReceivable: Math.max(totalGiven - totalReceivedBack, 0),
+      netPayable: Math.max(totalTaken - totalRepaid, 0),
+      transactionCount: personEntries.length,
+    },
+    transactions,
+  } satisfies PersonDetail;
+}
+
+async function ensureUniquePersonName(userId: string, normalizedName: string, excludedPersonId: string) {
+  const existing = await prismaClient.person.findFirst({
+    where: {
+      userId,
+      id: {
+        not: excludedPersonId,
+      },
+      OR: [
+        {
+          normalizedDisplayName: normalizedName,
+        },
+        {
+          aliases: {
+            some: {
+              normalizedAlias: normalizedName,
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      displayName: true,
+    },
+  });
+
+  return existing;
+}
+
+export async function renamePerson(params: {
+  userId: string;
+  personId: string;
+  displayName: string;
+}) {
+  const displayName = params.displayName.trim();
+  if (!displayName) {
+    throw new Error("A person name is required.");
+  }
+
+  const normalizedName = normalizePersonLookup(displayName);
+  const person = await prismaClient.person.findFirst({
+    where: {
+      id: params.personId,
+      userId: params.userId,
+    },
+    select: {
+      id: true,
+      displayName: true,
+    },
+  });
+
+  if (!person) {
+    throw new Error("The person could not be found.");
+  }
+
+  const conflicting = await ensureUniquePersonName(params.userId, normalizedName, person.id);
+  if (conflicting) {
+    throw new Error(`"${displayName}" is already linked to ${conflicting.displayName}.`);
+  }
+
+  await prismaClient.$transaction(async (tx) => {
+    await tx.person.update({
+      where: {
+        id: person.id,
+      },
+      data: {
+        displayName,
+        normalizedDisplayName: normalizedName,
+      },
+    });
+
+    await tx.personAlias.upsert({
+      where: {
+        personId_normalizedAlias: {
+          personId: person.id,
+          normalizedAlias: normalizePersonLookup(person.displayName),
+        },
+      },
+      update: {
+        alias: person.displayName,
+      },
+      create: {
+        personId: person.id,
+        alias: person.displayName,
+        normalizedAlias: normalizePersonLookup(person.displayName),
+      },
+    });
+
+    await tx.ledgerEntry.updateMany({
+      where: {
+        userId: params.userId,
+        personName: person.displayName,
+      },
+      data: {
+        personName: displayName,
+      },
+    });
+
+    await tx.reminder.updateMany({
+      where: {
+        userId: params.userId,
+        linkedPerson: person.displayName,
+      },
+      data: {
+        linkedPerson: displayName,
+      },
+    });
+  });
+
+  return {
+    ok: true as const,
+    message: "Person name updated successfully.",
+  };
+}
+
+export async function addPersonAlias(params: {
+  userId: string;
+  personId: string;
+  alias: string;
+}) {
+  const alias = params.alias.trim();
+  if (!alias) {
+    throw new Error("An alias is required.");
+  }
+
+  const normalizedAlias = normalizePersonLookup(alias);
+  const person = await prismaClient.person.findFirst({
+    where: {
+      id: params.personId,
+      userId: params.userId,
+    },
+    select: {
+      id: true,
+      displayName: true,
+      aliases: {
+        select: {
+          alias: true,
+          normalizedAlias: true,
+        },
+      },
+    },
+  });
+
+  if (!person) {
+    throw new Error("The person could not be found.");
+  }
+
+  const matchingOtherPerson = await prismaClient.person.findFirst({
+    where: {
+      userId: params.userId,
+      id: {
+        not: person.id,
+      },
+      OR: [
+        {
+          normalizedDisplayName: normalizedAlias,
+        },
+        {
+          aliases: {
+            some: {
+              normalizedAlias,
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      displayName: true,
+      aliases: {
+        select: {
+          alias: true,
+          normalizedAlias: true,
+        },
+      },
+    },
+  });
+
+  await prismaClient.$transaction(async (tx) => {
+    if (matchingOtherPerson) {
+      const namesToMove = Array.from(
+        new Set([
+          matchingOtherPerson.displayName,
+          ...matchingOtherPerson.aliases.map((item) => item.alias),
+        ]),
+      );
+
+      await tx.ledgerEntry.updateMany({
+        where: {
+          userId: params.userId,
+          personName: {
+            in: namesToMove,
+          },
+        },
+        data: {
+          personName: person.displayName,
+        },
+      });
+
+      await tx.reminder.updateMany({
+        where: {
+          userId: params.userId,
+          linkedPerson: {
+            in: namesToMove,
+          },
+        },
+        data: {
+          linkedPerson: person.displayName,
+        },
+      });
+
+      for (const carriedAlias of namesToMove) {
+        const normalizedCarriedAlias = normalizePersonLookup(carriedAlias);
+        if (!normalizedCarriedAlias || normalizedCarriedAlias === normalizePersonLookup(person.displayName)) {
+          continue;
+        }
+
+        await tx.personAlias.upsert({
+          where: {
+            personId_normalizedAlias: {
+              personId: person.id,
+              normalizedAlias: normalizedCarriedAlias,
+            },
+          },
+          update: {
+            alias: carriedAlias,
+          },
+          create: {
+            personId: person.id,
+            alias: carriedAlias,
+            normalizedAlias: normalizedCarriedAlias,
+          },
+        });
+      }
+
+      await tx.personAlias.deleteMany({
+        where: {
+          personId: matchingOtherPerson.id,
+        },
+      });
+
+      await tx.person.delete({
+        where: {
+          id: matchingOtherPerson.id,
+        },
+      });
+    }
+
+    if (normalizedAlias !== normalizePersonLookup(person.displayName)) {
+      await tx.personAlias.upsert({
+        where: {
+          personId_normalizedAlias: {
+            personId: person.id,
+            normalizedAlias,
+          },
+        },
+        update: {
+          alias,
+        },
+        create: {
+          personId: person.id,
+          alias,
+          normalizedAlias,
+        },
+      });
+    }
+  });
+
+  return {
+    ok: true as const,
+    message: matchingOtherPerson
+      ? `Alias added and ${matchingOtherPerson.displayName} was merged into ${person.displayName}.`
+      : "Alias added successfully.",
+  };
+}

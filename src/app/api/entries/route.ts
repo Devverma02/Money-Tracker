@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { saveEntryResponseSchema, saveEntryRequestSchema } from "@/lib/ledger/save-contract";
 import { saveParsedEntries } from "@/lib/ledger/save-entry";
+import { PersonAmbiguityError } from "@/lib/persons/person-resolution";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -51,6 +52,18 @@ export async function POST(request: Request) {
 
     return NextResponse.json(saveEntryResponseSchema.parse(result));
   } catch (error) {
+    if (error instanceof PersonAmbiguityError) {
+      return NextResponse.json(
+        {
+          saved: false,
+          errorCode: "person_ambiguity",
+          message: error.message,
+          conflicts: error.conflicts,
+        },
+        { status: 409 },
+      );
+    }
+
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }

@@ -61,17 +61,25 @@ function zonedDateTimeToUtc(
   return new Date(utcGuess.getTime() - offset);
 }
 
-function getPeriodStart(period: HistoryFilterPeriod, timeZone: string) {
+function getPeriodRange(period: HistoryFilterPeriod, timeZone: string) {
   const now = new Date();
   const zonedNow = getZonedDateParts(now, timeZone);
 
   if (period === "today") {
-    return zonedDateTimeToUtc(
+    const start = zonedDateTimeToUtc(
       zonedNow.year,
       zonedNow.month,
       zonedNow.day,
       timeZone,
     );
+    const end = zonedDateTimeToUtc(
+      zonedNow.year,
+      zonedNow.month,
+      zonedNow.day + 1,
+      timeZone,
+    );
+
+    return { start, end };
   }
 
   if (period === "week") {
@@ -84,16 +92,33 @@ function getPeriodStart(period: HistoryFilterPeriod, timeZone: string) {
       Date.UTC(zonedNow.year, zonedNow.month - 1, zonedNow.day - diff),
     );
 
-    return zonedDateTimeToUtc(
+    const start = zonedDateTimeToUtc(
       mondayUtc.getUTCFullYear(),
       mondayUtc.getUTCMonth() + 1,
       mondayUtc.getUTCDate(),
       timeZone,
     );
+    const end = zonedDateTimeToUtc(
+      mondayUtc.getUTCFullYear(),
+      mondayUtc.getUTCMonth() + 1,
+      mondayUtc.getUTCDate() + 7,
+      timeZone,
+    );
+
+    return { start, end };
   }
 
   if (period === "month") {
-    return zonedDateTimeToUtc(zonedNow.year, zonedNow.month, 1, timeZone);
+    const start = zonedDateTimeToUtc(zonedNow.year, zonedNow.month, 1, timeZone);
+    const nextMonthStartUtc = new Date(Date.UTC(zonedNow.year, zonedNow.month, 1));
+    const end = zonedDateTimeToUtc(
+      nextMonthStartUtc.getUTCFullYear(),
+      nextMonthStartUtc.getUTCMonth() + 1,
+      nextMonthStartUtc.getUTCDate(),
+      timeZone,
+    );
+
+    return { start, end };
   }
 
   return null;
@@ -110,6 +135,7 @@ function normalizeFilters(input?: Partial<HistoryFilters>): HistoryFilters {
     entryType: input?.entryType?.trim() ?? "",
     period:
       period === "today" || period === "week" || period === "month" ? period : "all",
+    search: input?.search?.trim() ?? "",
   };
 }
 
@@ -156,11 +182,30 @@ export async function getRecentEntries(
   input?: Partial<HistoryFilters>,
 ): Promise<HistoryPageData> {
   const filters = normalizeFilters(input);
-  const periodStart = getPeriodStart(filters.period, timeZone);
+  const periodRange = getPeriodRange(filters.period, timeZone);
+  const searchFilter = filters.search
+    ? {
+        OR: [
+          { sourceText: { contains: filters.search, mode: "insensitive" as const } },
+          { note: { contains: filters.search, mode: "insensitive" as const } },
+          { personName: { contains: filters.search, mode: "insensitive" as const } },
+          { category: { contains: filters.search, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
+
   const where = {
     userId,
     ...(filters.entryType ? { entryType: filters.entryType as never } : {}),
-    ...(periodStart ? { entryDate: { gte: periodStart } } : {}),
+    ...(periodRange
+      ? {
+          entryDate: {
+            gte: periodRange.start,
+            lt: periodRange.end,
+          },
+        }
+      : {}),
+    ...searchFilter,
   };
 
   const totalCount = await prisma.ledgerEntry.count({ where });

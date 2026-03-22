@@ -259,6 +259,15 @@ export async function getDashboardSummary(
     month,
     pendingLoans,
     topSpendingCategory,
+    monthlyReport: {
+      cashInTotal: month.cashInTotal,
+      cashOutTotal: month.cashOutTotal,
+      topSpendingCategory,
+      topReceivablePerson:
+        pendingLoans.find((item) => item.receivable > 0) ?? null,
+      topPayablePerson:
+        pendingLoans.find((item) => item.payable > 0) ?? null,
+    },
     insightText: "",
   };
 

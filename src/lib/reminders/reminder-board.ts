@@ -91,39 +91,91 @@ export async function getReminderBoard(
   void timeZone;
   await refreshReminderStatuses(userId);
 
-  const reminders = await prisma.reminder.findMany({
-    where: {
-      userId,
-    },
-    select: {
-      id: true,
-      title: true,
-      linkedPerson: true,
-      dueAt: true,
-      snoozeUntil: true,
-      status: true,
-      linkedEntryId: true,
-      createdAt: true,
-      updatedAt: true,
-      bucket: {
-        select: {
-          slug: true,
-        },
+  const activeStatuses = [
+    ReminderStatus.PENDING,
+    ReminderStatus.SNOOZED,
+    ReminderStatus.OVERDUE,
+  ] as const;
+  const closedStatuses = [ReminderStatus.DONE, ReminderStatus.CANCELLED] as const;
+
+  const reminderSelect = {
+    id: true,
+    title: true,
+    linkedPerson: true,
+    dueAt: true,
+    snoozeUntil: true,
+    status: true,
+    linkedEntryId: true,
+    createdAt: true,
+    updatedAt: true,
+    bucket: {
+      select: {
+        slug: true,
       },
     },
-    orderBy: {
-      createdAt: "desc",
-    },
-    take: 40,
-  });
+  } as const;
 
-  const mapped = reminders.map(mapReminder);
-  const activeReminders = mapped
+  const [
+    activeReminderRows,
+    closedReminderRows,
+    activeCount,
+    overdueCount,
+    closedCount,
+  ] = await Promise.all([
+    prisma.reminder.findMany({
+      where: {
+        userId,
+        status: {
+          in: [...activeStatuses],
+        },
+      },
+      select: reminderSelect,
+    }),
+    prisma.reminder.findMany({
+      where: {
+        userId,
+        status: {
+          in: [...closedStatuses],
+        },
+      },
+      select: reminderSelect,
+      orderBy: {
+        updatedAt: "desc",
+      },
+      take: 8,
+    }),
+    prisma.reminder.count({
+      where: {
+        userId,
+        status: {
+          in: [...activeStatuses],
+        },
+      },
+    }),
+    prisma.reminder.count({
+      where: {
+        userId,
+        status: ReminderStatus.OVERDUE,
+      },
+    }),
+    prisma.reminder.count({
+      where: {
+        userId,
+        status: {
+          in: [...closedStatuses],
+        },
+      },
+    }),
+  ]);
+
+  const activeReminders = activeReminderRows
+    .map(mapReminder)
     .filter((item) =>
       item.status === "PENDING" || item.status === "SNOOZED" || item.status === "OVERDUE",
     )
     .sort((left, right) => left.effectiveDueAt.localeCompare(right.effectiveDueAt));
-  const closedReminders = mapped
+  const closedReminders = closedReminderRows
+    .map(mapReminder)
     .filter((item) => item.status === "DONE" || item.status === "CANCELLED")
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 
@@ -132,9 +184,9 @@ export async function getReminderBoard(
     activeReminders: activeReminders.slice(0, 12),
     closedReminders: closedReminders.slice(0, 8),
     counts: {
-      active: activeReminders.length,
-      overdue: activeReminders.filter((item) => item.status === "OVERDUE").length,
-      closed: closedReminders.length,
+      active: activeCount,
+      overdue: overdueCount,
+      closed: closedCount,
     },
     helperText: "",
   };

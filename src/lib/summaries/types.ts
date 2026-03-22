@@ -23,5 +23,27 @@ export type DashboardSummary = {
     category: string;
     amount: number;
   } | null;
+  monthlyReport: {
+    cashInTotal: number;
+    cashOutTotal: number;
+    topSpendingCategory: {
+      category: string;
+      amount: number;
+    } | null;
+    topReceivablePerson: PendingLoanSummary | null;
+    topPayablePerson: PendingLoanSummary | null;
+  };
   insightText: string;
+};
+
+export type RecurringSuggestion = {
+  id: string;
+  title: string;
+  suggestedText: string;
+  amount: number;
+  entryType: "expense" | "income" | "savings_deposit";
+  category: string | null;
+  personName: string | null;
+  nextExpectedDate: string;
+  patternMonths: number;
 };

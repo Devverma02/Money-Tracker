@@ -47,5 +47,26 @@ export const saveEntryResponseSchema = z.object({
   message: z.string(),
 });
 
+export const personCandidateSchema = z.object({
+  id: z.string().uuid(),
+  displayName: z.string().min(1),
+});
+
+export const personConflictSchema = z.object({
+  actionIndex: z.number().int().min(0),
+  inputName: z.string().min(1),
+  candidates: z.array(personCandidateSchema).min(2),
+});
+
+export const saveEntryConflictResponseSchema = z.object({
+  saved: z.literal(false),
+  errorCode: z.literal("person_ambiguity"),
+  message: z.string(),
+  conflicts: z.array(personConflictSchema).min(1),
+});
+
 export type SaveEntryRequest = z.infer<typeof saveEntryRequestSchema>;
 export type SaveEntryResponse = z.infer<typeof saveEntryResponseSchema>;
+export type SaveEntryConflictResponse = z.infer<typeof saveEntryConflictResponseSchema>;
+export type PersonCandidate = z.infer<typeof personCandidateSchema>;
+export type PersonConflict = z.infer<typeof personConflictSchema>;

@@ -1,6 +1,7 @@
 import { DashboardWorkspace } from "@/components/dashboard/dashboard-workspace";
 import { ensureAppProfile } from "@/lib/bootstrap-profile";
 import { getRecentEntries } from "@/lib/ledger/history";
+import { getRecurringSuggestions } from "@/lib/recurring/recurring-suggestions";
 import { getReminderBoard } from "@/lib/reminders/reminder-board";
 import { settingsResponseSchema } from "@/lib/settings/settings-contract";
 import { getDashboardSummary } from "@/lib/summaries/dashboard-summary";
@@ -12,6 +13,7 @@ type DashboardPageProps = {
     page?: string;
     type?: string;
     period?: string;
+    search?: string;
   }>;
 };
 
@@ -20,6 +22,7 @@ const allowedSections = new Set([
   "entry",
   "reminders",
   "history",
+  "persons",
   "ask-ai",
   "settings",
 ] as const);
@@ -43,11 +46,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           | "entry"
           | "reminders"
           | "history"
+          | "persons"
           | "ask-ai"
           | "settings")
       : "overview";
 
-  const [summary, reminders, historyPageData] = await Promise.all([
+  const [summary, reminders, historyPageData, recurringSuggestions] = await Promise.all([
     getDashboardSummary(user.id, profile.timezone),
     getReminderBoard(user.id, profile.timezone),
     getRecentEntries(user.id, profile.timezone, {
@@ -59,7 +63,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         params.period === "month"
           ? params.period
           : "all",
+      search: params.search ?? "",
     }),
+    getRecurringSuggestions(user.id, profile.timezone),
   ]);
 
   return (
@@ -77,6 +83,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       summary={summary}
       reminders={reminders}
       historyPageData={historyPageData}
+      recurringSuggestions={recurringSuggestions}
       initialSection={activeSection}
     />
   );
