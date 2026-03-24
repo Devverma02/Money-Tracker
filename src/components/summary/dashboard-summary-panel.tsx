@@ -1,35 +1,37 @@
+import { formatMoney } from "@/lib/settings/currency";
+import type { CurrencyCodeValue } from "@/lib/settings/settings-contract";
 import type { DashboardSummary } from "@/lib/summaries/types";
 
 type DashboardSummaryPanelProps = {
   summary: DashboardSummary;
   activeReminderCount?: number;
   overdueReminderCount?: number;
+  displayName?: string;
+  currency: CurrencyCodeValue;
 };
-
-function formatCurrency(amount: number) {
-  return `Rs ${amount.toLocaleString("en-IN")}`;
-}
 
 export function DashboardSummaryPanel({
   summary,
   activeReminderCount = 0,
   overdueReminderCount = 0,
+  displayName = "",
+  currency,
 }: DashboardSummaryPanelProps) {
   const summaryCards = [
     {
       label: summary.today.label,
-      amount: formatCurrency(summary.today.netCashMovement),
-      helper: `${summary.today.entryCount} entries | in ${formatCurrency(summary.today.cashInTotal)} | out ${formatCurrency(summary.today.cashOutTotal)}`,
+      amount: formatMoney(summary.today.netCashMovement, currency),
+      helper: `${summary.today.entryCount} entries | in ${formatMoney(summary.today.cashInTotal, currency)} | out ${formatMoney(summary.today.cashOutTotal, currency)}`,
     },
     {
       label: summary.week.label,
-      amount: formatCurrency(summary.week.netCashMovement),
-      helper: `${summary.week.entryCount} entries | in ${formatCurrency(summary.week.cashInTotal)} | out ${formatCurrency(summary.week.cashOutTotal)}`,
+      amount: formatMoney(summary.week.netCashMovement, currency),
+      helper: `${summary.week.entryCount} entries | in ${formatMoney(summary.week.cashInTotal, currency)} | out ${formatMoney(summary.week.cashOutTotal, currency)}`,
     },
     {
       label: summary.month.label,
-      amount: formatCurrency(summary.month.netCashMovement),
-      helper: `${summary.month.entryCount} entries | in ${formatCurrency(summary.month.cashInTotal)} | out ${formatCurrency(summary.month.cashOutTotal)}`,
+      amount: formatMoney(summary.month.netCashMovement, currency),
+      helper: `${summary.month.entryCount} entries | in ${formatMoney(summary.month.cashInTotal, currency)} | out ${formatMoney(summary.month.cashOutTotal, currency)}`,
     },
     {
       label: "Active reminders",
@@ -42,6 +44,9 @@ export function DashboardSummaryPanel({
     <section className="space-y-4">
       <div>
         <h2 className="text-xl font-bold text-gray-900">Money overview</h2>
+        {displayName ? (
+          <p className="mt-1 text-sm text-gray-500">Welcome back, {displayName}.</p>
+        ) : null}
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -64,14 +69,14 @@ export function DashboardSummaryPanel({
           <article className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
             <p className="text-xs font-medium text-emerald-500">Kitna aaya</p>
             <p className="mt-2 font-mono text-2xl font-bold text-emerald-700">
-              {formatCurrency(summary.monthlyReport.cashInTotal)}
+              {formatMoney(summary.monthlyReport.cashInTotal, currency)}
             </p>
           </article>
 
           <article className="rounded-lg border border-red-100 bg-red-50 p-4">
             <p className="text-xs font-medium text-red-500">Kitna gaya</p>
             <p className="mt-2 font-mono text-2xl font-bold text-red-700">
-              {formatCurrency(summary.monthlyReport.cashOutTotal)}
+              {formatMoney(summary.monthlyReport.cashOutTotal, currency)}
             </p>
           </article>
 
@@ -82,7 +87,7 @@ export function DashboardSummaryPanel({
             </p>
             {summary.monthlyReport.topSpendingCategory ? (
               <p className="mt-1 text-sm text-gray-500">
-                {formatCurrency(summary.monthlyReport.topSpendingCategory.amount)}
+                {formatMoney(summary.monthlyReport.topSpendingCategory.amount, currency)}
               </p>
             ) : null}
           </article>
@@ -94,7 +99,7 @@ export function DashboardSummaryPanel({
                 Receive:{" "}
                 <span className="font-semibold text-gray-900">
                   {summary.monthlyReport.topReceivablePerson
-                    ? `${summary.monthlyReport.topReceivablePerson.personName} (${formatCurrency(summary.monthlyReport.topReceivablePerson.receivable)})`
+                    ? `${summary.monthlyReport.topReceivablePerson.personName} (${formatMoney(summary.monthlyReport.topReceivablePerson.receivable, currency)})`
                     : "None"}
                 </span>
               </p>
@@ -102,7 +107,7 @@ export function DashboardSummaryPanel({
                 Pay:{" "}
                 <span className="font-semibold text-gray-900">
                   {summary.monthlyReport.topPayablePerson
-                    ? `${summary.monthlyReport.topPayablePerson.personName} (${formatCurrency(summary.monthlyReport.topPayablePerson.payable)})`
+                    ? `${summary.monthlyReport.topPayablePerson.personName} (${formatMoney(summary.monthlyReport.topPayablePerson.payable, currency)})`
                     : "None"}
                 </span>
               </p>
@@ -134,8 +139,8 @@ export function DashboardSummaryPanel({
                   >
                     <p className="text-sm font-semibold text-gray-900">{item.personName}</p>
                     <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-gray-500">
-                      <span>To receive: {formatCurrency(item.receivable)}</span>
-                      <span>To pay: {formatCurrency(item.payable)}</span>
+                      <span>To receive: {formatMoney(item.receivable, currency)}</span>
+                      <span>To pay: {formatMoney(item.payable, currency)}</span>
                     </div>
                   </div>
                 ))}
@@ -155,7 +160,7 @@ export function DashboardSummaryPanel({
                   <span className="font-semibold text-gray-900">
                     {summary.topSpendingCategory.category}
                   </span>{" "}
-                  at {formatCurrency(summary.topSpendingCategory.amount)}.
+                  at {formatMoney(summary.topSpendingCategory.amount, currency)}.
                 </p>
               ) : (
                 <p>Top category will appear once you save more categorized expenses.</p>

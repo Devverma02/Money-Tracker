@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useMemo, useState, useTransition } from "react";
 import { ParsePreviewCard } from "@/components/entry/parse-preview-card";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ParseResult, ParsedAction } from "@/lib/ai/parse-contract";
@@ -112,6 +112,9 @@ export function TextEntryWorkspace({
   );
   const [isParsing, startParseTransition] = useTransition();
   const [isSaving, startSaveTransition] = useTransition();
+  const replaySeedParse = useEffectEvent((draftSeed: string) => {
+    runParse(draftSeed, "text");
+  });
 
   useEffect(() => {
     setSelectedIndexes(getReadyActionIndexes(result));
@@ -124,6 +127,7 @@ export function TextEntryWorkspace({
 
     setEntryInputMode("typing");
     setInputText(initialDraftSeed);
+    replaySeedParse(initialDraftSeed);
     onDraftSeedConsumed?.();
   }, [initialDraftSeed, onDraftSeedConsumed]);
 

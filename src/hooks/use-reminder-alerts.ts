@@ -1,110 +1,98 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { ReminderBoard } from "@/lib/reminders/types";
+import { useEffect, useSyncExternalStore } from "react";
+import { publicEnv } from "@/lib/env/public";
 
 const ALERTS_STORAGE_KEY = "moneymanage.reminder-alerts-enabled";
-const SHOWN_STORAGE_KEY = "moneymanage.reminder-alerts-shown";
 
-function readShownMap() {
-  if (typeof window === "undefined") {
-    return {} as Record<string, string>;
-  }
+type ReminderAlertsSnapshot = {
+  enabled: boolean;
+  permission: NotificationPermission;
+  isSupported: boolean;
+};
 
-  try {
-    const raw = window.localStorage.getItem(SHOWN_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
+const serverSnapshot: ReminderAlertsSnapshot = {
+  enabled: false,
+  permission: "default",
+  isSupported: false,
+};
+
+function base64UrlToUint8Array(base64Url: string) {
+  const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
+  const base64 = (base64Url + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
 }
 
-function writeShownMap(nextMap: Record<string, string>) {
-  if (typeof window === "undefined") {
-    return;
+async function registerReminderServiceWorker() {
+  const existingRegistration = await navigator.serviceWorker.getRegistration("/sw.js");
+  if (existingRegistration) {
+    return existingRegistration;
   }
 
-  window.localStorage.setItem(SHOWN_STORAGE_KEY, JSON.stringify(nextMap));
+  return navigator.serviceWorker.register("/sw.js");
 }
 
-export function useReminderAlerts({ timezone }: { timezone: string }) {
-  const [enabled, setEnabled] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
+export function useReminderAlerts() {
+  const hasVapidKey = Boolean(publicEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+  const snapshot = useSyncExternalStore(
+    () => () => {},
+    () => {
+      if (typeof window === "undefined") {
+        return serverSnapshot;
+      }
 
-    return window.localStorage.getItem(ALERTS_STORAGE_KEY) === "true";
-  });
-  const [permission, setPermission] = useState<NotificationPermission>(() => {
-    if (typeof Notification === "undefined") {
-      return "denied";
-    }
-
-    return Notification.permission;
-  });
+      return {
+        enabled: window.localStorage.getItem(ALERTS_STORAGE_KEY) === "true",
+        permission:
+          typeof Notification === "undefined" ? "denied" : Notification.permission,
+        isSupported:
+          hasVapidKey &&
+          "serviceWorker" in navigator &&
+          "PushManager" in window &&
+          "Notification" in window,
+      } satisfies ReminderAlertsSnapshot;
+    },
+    () => serverSnapshot,
+  );
 
   useEffect(() => {
-    if (!enabled || permission !== "granted" || typeof window === "undefined") {
+    if (!snapshot.isSupported || snapshot.permission !== "granted" || !snapshot.enabled) {
       return;
     }
 
-    let isDisposed = false;
+    let cancelled = false;
 
-    const runPoll = async () => {
+    const syncExistingSubscription = async () => {
       try {
-        const response = await fetch(`/api/reminders?timezone=${encodeURIComponent(timezone)}`);
-        if (!response.ok) {
+        const registration = await registerReminderServiceWorker();
+        const subscription = await registration.pushManager.getSubscription();
+
+        if (!subscription || cancelled) {
           return;
         }
 
-        const board = (await response.json()) as ReminderBoard;
-        const dueNow = board.activeReminders.filter((item) => {
-          const effectiveTime = new Date(item.effectiveDueAt).getTime();
-          return item.isOverdue || effectiveTime - Date.now() <= 5 * 60 * 1000;
+        await fetch("/api/push-subscriptions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(subscription.toJSON()),
         });
-
-        const shownMap = readShownMap();
-
-        for (const reminder of dueNow) {
-          if (shownMap[reminder.id] === reminder.effectiveDueAt) {
-            continue;
-          }
-
-          if (isDisposed) {
-            return;
-          }
-
-          new Notification("MoneyManage reminder", {
-            body: reminder.title,
-            tag: `reminder-${reminder.id}`,
-          });
-          shownMap[reminder.id] = reminder.effectiveDueAt;
-        }
-
-        writeShownMap(shownMap);
       } catch {
-        // Ignore polling failures and try again later.
+        // Ignore background sync failures and retry on next enable.
       }
     };
 
-    void runPoll();
-    const interval = window.setInterval(() => {
-      void runPoll();
-    }, 60_000);
+    void syncExistingSubscription();
 
     return () => {
-      isDisposed = true;
-      window.clearInterval(interval);
+      cancelled = true;
     };
-  }, [enabled, permission, timezone]);
-
-  const isSupported = useMemo(
-    () => typeof window !== "undefined" && "Notification" in window,
-    [],
-  );
+  }, [snapshot.enabled, snapshot.isSupported, snapshot.permission]);
 
   const enableAlerts = async () => {
-    if (!isSupported || typeof Notification === "undefined") {
+    if (!snapshot.isSupported || typeof Notification === "undefined") {
       return;
     }
 
@@ -113,27 +101,65 @@ export function useReminderAlerts({ timezone }: { timezone: string }) {
         ? "granted"
         : await Notification.requestPermission();
 
-    setPermission(nextPermission);
-
-    if (nextPermission === "granted") {
-      window.localStorage.setItem(ALERTS_STORAGE_KEY, "true");
-      setEnabled(true);
+    if (nextPermission !== "granted") {
+      return;
     }
+
+    const registration = await registerReminderServiceWorker();
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: base64UrlToUint8Array(
+          publicEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+        ),
+      });
+    }
+
+    await fetch("/api/push-subscriptions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(subscription.toJSON()),
+    });
+
+    window.localStorage.setItem(ALERTS_STORAGE_KEY, "true");
   };
 
-  const disableAlerts = () => {
+  const disableAlerts = async () => {
     if (typeof window === "undefined") {
       return;
     }
 
+    if (snapshot.isSupported) {
+      try {
+        const registration = await registerReminderServiceWorker();
+        const subscription = await registration.pushManager.getSubscription();
+
+        if (subscription) {
+          await fetch("/api/push-subscriptions", {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(subscription.toJSON()),
+          });
+          await subscription.unsubscribe();
+        }
+      } catch {
+        // Best-effort unsubscribe.
+      }
+    }
+
     window.localStorage.setItem(ALERTS_STORAGE_KEY, "false");
-    setEnabled(false);
   };
 
   return {
-    enabled,
-    permission,
-    isSupported,
+    enabled: snapshot.enabled,
+    permission: snapshot.permission,
+    isSupported: snapshot.isSupported,
     enableAlerts,
     disableAlerts,
   };

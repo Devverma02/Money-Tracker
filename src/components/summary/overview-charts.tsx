@@ -16,6 +16,8 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { formatCompactMoney } from "@/lib/settings/currency";
+import type { CurrencyCodeValue } from "@/lib/settings/settings-contract";
 
 type DailyData = { day: string; expense: number; income: number };
 type CategoryData = { category: string; amount: number };
@@ -49,17 +51,9 @@ const PIE_COLORS = [
   "#ec4899",
 ];
 
-function formatCurrency(amount: number) {
-  if (amount >= 1000) {
-    return `Rs ${(amount / 1000).toFixed(1)}k`;
-  }
-
-  return `Rs ${amount}`;
-}
-
-function formatTooltipValue(value: TooltipValue) {
+function formatTooltipValue(value: TooltipValue, currency: CurrencyCodeValue) {
   const numericValue = Array.isArray(value) ? Number(value[0]) : Number(value);
-  return formatCurrency(Number.isFinite(numericValue) ? numericValue : 0);
+  return formatCompactMoney(Number.isFinite(numericValue) ? numericValue : 0, currency);
 }
 
 function renderPieLabel(props: PieLabelLike) {
@@ -72,7 +66,13 @@ function renderPieLabel(props: PieLabelLike) {
   return `${category} ${Math.round(props.percent * 100)}%`;
 }
 
-export function OverviewCharts({ timezone }: { timezone: string }) {
+export function OverviewCharts({
+  timezone,
+  currency,
+}: {
+  timezone: string;
+  currency: CurrencyCodeValue;
+}) {
   const [data, setData] = useState<ChartData | null>(null);
   const [isLoading, startTransition] = useTransition();
 
@@ -140,14 +140,14 @@ export function OverviewCharts({ timezone }: { timezone: string }) {
                 tickLine={false}
               />
               <YAxis
-                tickFormatter={formatCurrency}
+                tickFormatter={(value) => formatCompactMoney(Number(value), currency)}
                 tick={{ fontSize: 11, fill: "#9ca3af" }}
                 axisLine={false}
                 tickLine={false}
                 width={56}
               />
               <Tooltip
-                formatter={(value) => formatTooltipValue(value)}
+                formatter={(value) => formatTooltipValue(value, currency)}
                 contentStyle={{
                   borderRadius: 8,
                   border: "1px solid #e5e7eb",
@@ -201,7 +201,7 @@ export function OverviewCharts({ timezone }: { timezone: string }) {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value) => formatTooltipValue(value)}
+                  formatter={(value) => formatTooltipValue(value, currency)}
                   contentStyle={{
                     borderRadius: 8,
                     border: "1px solid #e5e7eb",
@@ -232,14 +232,14 @@ export function OverviewCharts({ timezone }: { timezone: string }) {
                 tickLine={false}
               />
               <YAxis
-                tickFormatter={formatCurrency}
+                tickFormatter={(value) => formatCompactMoney(Number(value), currency)}
                 tick={{ fontSize: 11, fill: "#9ca3af" }}
                 axisLine={false}
                 tickLine={false}
                 width={56}
               />
               <Tooltip
-                formatter={(value) => formatTooltipValue(value)}
+                formatter={(value) => formatTooltipValue(value, currency)}
                 contentStyle={{
                   borderRadius: 8,
                   border: "1px solid #e5e7eb",

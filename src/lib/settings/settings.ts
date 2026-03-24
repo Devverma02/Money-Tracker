@@ -1,4 +1,4 @@
-import { PreferredLanguage, EntryInputPreference } from "@prisma/client";
+import { CurrencyCode, PreferredLanguage, EntryInputPreference } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { SettingsResponse, UpdateSettingsRequest } from "@/lib/settings/settings-contract";
 
@@ -12,6 +12,7 @@ export async function getUserSettings(userId: string): Promise<SettingsResponse>
       email: true,
       preferredLanguage: true,
       timezone: true,
+      preferredCurrency: true,
       voiceRepliesEnabled: true,
       reminderDefaultTime: true,
       preferredEntryInput: true,
@@ -27,6 +28,7 @@ export async function getUserSettings(userId: string): Promise<SettingsResponse>
     email: profile.email ?? null,
     preferredLanguage: profile.preferredLanguage ?? "HINGLISH",
     timezone: profile.timezone ?? "Asia/Kolkata",
+    preferredCurrency: profile.preferredCurrency ?? "INR",
     voiceRepliesEnabled: profile.voiceRepliesEnabled ?? true,
     reminderDefaultTime: profile.reminderDefaultTime ?? "09:00",
     preferredEntryInput: profile.preferredEntryInput ?? "TYPING",
@@ -45,6 +47,7 @@ export async function updateUserSettings(
       displayName: payload.displayName,
       preferredLanguage: payload.preferredLanguage as PreferredLanguage,
       timezone: payload.timezone,
+      preferredCurrency: payload.preferredCurrency as CurrencyCode,
       voiceRepliesEnabled: payload.voiceRepliesEnabled,
       reminderDefaultTime: payload.reminderDefaultTime,
       preferredEntryInput: payload.preferredEntryInput as EntryInputPreference,
@@ -54,6 +57,7 @@ export async function updateUserSettings(
       email: true,
       preferredLanguage: true,
       timezone: true,
+      preferredCurrency: true,
       voiceRepliesEnabled: true,
       reminderDefaultTime: true,
       preferredEntryInput: true,
@@ -65,6 +69,7 @@ export async function updateUserSettings(
     email: profile.email ?? null,
     preferredLanguage: profile.preferredLanguage ?? "HINGLISH",
     timezone: profile.timezone ?? "Asia/Kolkata",
+    preferredCurrency: profile.preferredCurrency ?? "INR",
     voiceRepliesEnabled: profile.voiceRepliesEnabled ?? true,
     reminderDefaultTime: profile.reminderDefaultTime ?? "09:00",
     preferredEntryInput: profile.preferredEntryInput ?? "TYPING",

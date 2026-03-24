@@ -12,8 +12,9 @@ import { OverviewCharts } from "@/components/summary/overview-charts";
 import { useReminderAlerts } from "@/hooks/use-reminder-alerts";
 import type { SettingsResponse } from "@/lib/settings/settings-contract";
 import { DashboardSummaryPanel } from "@/components/summary/dashboard-summary-panel";
+import { formatDateInputForTimeZone } from "@/lib/dates/timezone-datetime";
 import type { HistoryPageData } from "@/lib/ledger/history-types";
-import type { ReminderBoard } from "@/lib/reminders/types";
+import type { ReminderBoard, ReminderDraftSeed } from "@/lib/reminders/types";
 import type { DashboardSummary, RecurringSuggestion } from "@/lib/summaries/types";
 
 type DashboardWorkspaceProps = {
@@ -184,6 +185,9 @@ function OverviewSection({
   recurringSuggestions,
   onOpenSection,
   onUseRecurringSuggestion,
+  onCreateRecurringReminder,
+  displayName,
+  currency,
 }: {
   timezone: string;
   summary: DashboardSummary;
@@ -191,6 +195,9 @@ function OverviewSection({
   recurringSuggestions: RecurringSuggestion[];
   onOpenSection: (sectionId: DashboardSectionId) => void;
   onUseRecurringSuggestion: (suggestedText: string) => void;
+  onCreateRecurringReminder: (suggestion: RecurringSuggestion) => void;
+  displayName: string;
+  currency: SettingsResponse["preferredCurrency"];
 }) {
   return (
     <div className="space-y-4">
@@ -198,9 +205,11 @@ function OverviewSection({
         summary={summary}
         activeReminderCount={reminders.counts.active}
         overdueReminderCount={reminders.counts.overdue}
+        displayName={displayName}
+        currency={currency}
       />
 
-      <OverviewCharts timezone={timezone} />
+      <OverviewCharts timezone={timezone} currency={currency} />
 
       {recurringSuggestions.length > 0 ? (
         <section className="rounded-xl border border-gray-200 bg-white p-5">
@@ -222,10 +231,8 @@ function OverviewSection({
 
           <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {recurringSuggestions.map((item) => (
-              <button
+              <div
                 key={item.id}
-                type="button"
-                onClick={() => onUseRecurringSuggestion(item.suggestedText)}
                 className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-[#0d9488] hover:bg-white"
               >
                 <p className="text-sm font-semibold text-gray-900">{item.title}</p>
@@ -233,7 +240,23 @@ function OverviewSection({
                 <p className="mt-2 text-xs text-gray-400">
                   Seen across {item.patternMonths} months
                 </p>
-              </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onUseRecurringSuggestion(item.suggestedText)}
+                    className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    Use this month
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCreateRecurringReminder(item)}
+                    className="rounded-md border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-[#0d9488] transition-colors hover:bg-teal-100"
+                  >
+                    Set reminder
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -319,10 +342,9 @@ export function DashboardWorkspace({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [entryDraftSeed, setEntryDraftSeed] = useState<string | null>(null);
+  const [reminderDraftSeed, setReminderDraftSeed] = useState<ReminderDraftSeed | null>(null);
   const activeSectionMeta = findSection(activeSection);
-  const reminderAlerts = useReminderAlerts({
-    timezone,
-  });
+  const reminderAlerts = useReminderAlerts();
 
   useEffect(() => {
     setActiveSection(initialSection);
@@ -353,6 +375,17 @@ export function DashboardWorkspace({
   const handleUseRecurringSuggestion = (suggestedText: string) => {
     setEntryDraftSeed(suggestedText);
     openSection("entry");
+  };
+
+  const handleCreateRecurringReminder = (suggestion: RecurringSuggestion) => {
+    const nextDate = new Date(suggestion.nextExpectedDate);
+    setReminderDraftSeed({
+      title: `Review ${suggestion.title}`,
+      linkedPerson: suggestion.personName ?? "",
+      dueDate: formatDateInputForTimeZone(nextDate, timezone),
+      dueTime: settings.reminderDefaultTime,
+    });
+    openSection("reminders");
   };
 
   return (
@@ -477,6 +510,9 @@ export function DashboardWorkspace({
             recurringSuggestions={recurringSuggestions}
             onOpenSection={openSection}
             onUseRecurringSuggestion={handleUseRecurringSuggestion}
+            onCreateRecurringReminder={handleCreateRecurringReminder}
+            displayName={settings.displayName}
+            currency={settings.preferredCurrency}
           />
         ) : null}
 
@@ -506,6 +542,8 @@ export function DashboardWorkspace({
             onEnableAlerts={reminderAlerts.enableAlerts}
             onDisableAlerts={reminderAlerts.disableAlerts}
             variant="page"
+            initialDraftSeed={reminderDraftSeed}
+            onDraftSeedConsumed={() => setReminderDraftSeed(null)}
           />
         ) : null}
 
@@ -518,7 +556,7 @@ export function DashboardWorkspace({
         ) : null}
 
         {activeSection === "persons" ? (
-          <PersonLedgerWorkspace />
+          <PersonLedgerWorkspace currency={settings.preferredCurrency} />
         ) : null}
 
         {activeSection === "ask-ai" ? (

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { formatMoney } from "@/lib/settings/currency";
+import type { CurrencyCodeValue } from "@/lib/settings/settings-contract";
 
 type PersonSummary = {
   personId: string;
@@ -44,6 +46,14 @@ type PersonDetail = {
   transactions: PersonTransaction[];
 };
 
+type PersonMergeSuggestion = {
+  sourcePersonId: string;
+  sourcePersonName: string;
+  targetPersonId: string;
+  targetPersonName: string;
+  reason: string;
+};
+
 const typeColorMap: Record<string, string> = {
   EXPENSE: "border-red-200 bg-red-50 text-red-700",
   INCOME: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -54,10 +64,6 @@ const typeColorMap: Record<string, string> = {
   SAVINGS_DEPOSIT: "border-indigo-200 bg-indigo-50 text-indigo-700",
   NOTE: "border-gray-200 bg-gray-50 text-gray-600",
 };
-
-function formatCurrency(amount: number) {
-  return `Rs ${amount.toLocaleString("en-IN")}`;
-}
 
 function formatEntryType(entryType: string) {
   return entryType.replaceAll("_", " ").toLowerCase();
@@ -71,8 +77,9 @@ function formatDate(isoString: string) {
   });
 }
 
-export function PersonLedgerWorkspace() {
+export function PersonLedgerWorkspace({ currency }: { currency: CurrencyCodeValue }) {
   const [persons, setPersons] = useState<PersonSummary[]>([]);
+  const [mergeSuggestions, setMergeSuggestions] = useState<PersonMergeSuggestion[]>([]);
   const [selectedPerson, setSelectedPerson] = useState<PersonDetail | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [renameValue, setRenameValue] = useState("");
@@ -89,7 +96,7 @@ export function PersonLedgerWorkspace() {
         setError(null);
         const response = await fetch("/api/persons");
         const payload = (await response.json()) as
-          | { persons: PersonSummary[] }
+          | { persons: PersonSummary[]; mergeSuggestions?: PersonMergeSuggestion[] }
           | { error?: string };
 
         if (!response.ok) {
@@ -102,6 +109,7 @@ export function PersonLedgerWorkspace() {
 
         if ("persons" in payload) {
           setPersons(payload.persons);
+          setMergeSuggestions(payload.mergeSuggestions ?? []);
         }
       } catch (caughtError) {
         setError(
@@ -254,6 +262,47 @@ export function PersonLedgerWorkspace() {
     });
   };
 
+  const handleMergeSuggestion = (suggestion: PersonMergeSuggestion) => {
+    startSavingTransition(async () => {
+      try {
+        setError(null);
+        setSuccess(null);
+
+        const response = await fetch("/api/persons", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            personId: suggestion.targetPersonId,
+            alias: suggestion.sourcePersonName,
+          }),
+        });
+        const payload = (await response.json()) as {
+          ok?: true;
+          message?: string;
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "The people could not be merged.");
+        }
+
+        setSuccess(payload.message ?? "People merged successfully.");
+        if (selectedPerson?.personId === suggestion.sourcePersonId) {
+          setSelectedPerson(null);
+        }
+        await loadPersons();
+      } catch (caughtError) {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The people could not be merged.",
+        );
+      }
+    });
+  };
+
   if (selectedPerson) {
     const { summary, transactions } = selectedPerson;
 
@@ -358,7 +407,7 @@ export function PersonLedgerWorkspace() {
                 You gave
               </p>
               <p className="mt-1 font-mono text-lg font-bold text-orange-700">
-                {formatCurrency(summary.totalGiven)}
+                {formatMoney(summary.totalGiven, currency)}
               </p>
             </div>
             <div className="rounded-lg border border-teal-100 bg-teal-50 p-3">
@@ -366,7 +415,7 @@ export function PersonLedgerWorkspace() {
                 Got back
               </p>
               <p className="mt-1 font-mono text-lg font-bold text-teal-700">
-                {formatCurrency(summary.totalReceivedBack)}
+                {formatMoney(summary.totalReceivedBack, currency)}
               </p>
             </div>
             <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
@@ -374,7 +423,7 @@ export function PersonLedgerWorkspace() {
                 You took
               </p>
               <p className="mt-1 font-mono text-lg font-bold text-amber-700">
-                {formatCurrency(summary.totalTaken)}
+                {formatMoney(summary.totalTaken, currency)}
               </p>
             </div>
             <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
@@ -382,7 +431,7 @@ export function PersonLedgerWorkspace() {
                 You repaid
               </p>
               <p className="mt-1 font-mono text-lg font-bold text-blue-700">
-                {formatCurrency(summary.totalRepaid)}
+                {formatMoney(summary.totalRepaid, currency)}
               </p>
             </div>
           </div>
@@ -394,7 +443,7 @@ export function PersonLedgerWorkspace() {
                   {selectedPerson.personName} se lena baki
                 </p>
                 <p className="mt-1 font-mono text-2xl font-bold text-orange-700">
-                  {formatCurrency(summary.netReceivable)}
+                  {formatMoney(summary.netReceivable, currency)}
                 </p>
               </div>
             ) : null}
@@ -405,7 +454,7 @@ export function PersonLedgerWorkspace() {
                   {selectedPerson.personName} ko dena baki
                 </p>
                 <p className="mt-1 font-mono text-2xl font-bold text-amber-700">
-                  {formatCurrency(summary.netPayable)}
+                  {formatMoney(summary.netPayable, currency)}
                 </p>
               </div>
             ) : null}
@@ -457,7 +506,7 @@ export function PersonLedgerWorkspace() {
                             ) : null}
                           </div>
                           <p className="font-mono text-lg font-bold text-gray-900">
-                            {formatCurrency(txn.amount)}
+                            {formatMoney(txn.amount, currency)}
                           </p>
                         </div>
                         {txn.note || txn.sourceText ? (
@@ -498,7 +547,7 @@ export function PersonLedgerWorkspace() {
               Total lena baki
             </p>
             <p className="mt-1 font-mono text-xl font-bold text-orange-700">
-              {formatCurrency(totalReceivable)}
+              {formatMoney(totalReceivable, currency)}
             </p>
           </div>
           <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-center">
@@ -506,7 +555,7 @@ export function PersonLedgerWorkspace() {
               Total dena baki
             </p>
             <p className="mt-1 font-mono text-xl font-bold text-amber-700">
-              {formatCurrency(totalPayable)}
+              {formatMoney(totalPayable, currency)}
             </p>
           </div>
           <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-center">
@@ -519,7 +568,7 @@ export function PersonLedgerWorkspace() {
               }`}
             >
               {totalReceivable - totalPayable >= 0 ? "+" : ""}
-              {formatCurrency(totalReceivable - totalPayable)}
+              {formatMoney(totalReceivable - totalPayable, currency)}
             </p>
           </div>
         </div>
@@ -540,6 +589,35 @@ export function PersonLedgerWorkspace() {
 
         {success ? (
           <p className="status-positive mt-3 rounded-lg border px-3 py-2 text-sm">{success}</p>
+        ) : null}
+
+        {mergeSuggestions.length > 0 ? (
+          <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50 p-3">
+            <p className="text-sm font-semibold text-gray-900">Possible merges</p>
+            <div className="mt-3 space-y-2">
+              {mergeSuggestions.slice(0, 4).map((suggestion) => (
+                <div
+                  key={`${suggestion.sourcePersonId}-${suggestion.targetPersonId}`}
+                  className="flex flex-col gap-2 rounded-lg border border-teal-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {suggestion.sourcePersonName} and {suggestion.targetPersonName}
+                    </p>
+                    <p className="mt-0.5 text-xs text-gray-500">{suggestion.reason}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleMergeSuggestion(suggestion)}
+                    disabled={isSaving}
+                    className="rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-[#0d9488] transition-colors hover:bg-teal-100 disabled:opacity-60"
+                  >
+                    Merge into {suggestion.targetPersonName}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : null}
       </div>
 
@@ -614,7 +692,7 @@ export function PersonLedgerWorkspace() {
                   <div className="rounded-lg border border-orange-100 bg-orange-50 px-2.5 py-1.5">
                     <p className="text-[10px] font-medium text-orange-400">Lena baki</p>
                     <p className="font-mono text-sm font-bold text-orange-700">
-                      {formatCurrency(person.netReceivable)}
+                      {formatMoney(person.netReceivable, currency)}
                     </p>
                   </div>
                 ) : (
@@ -628,7 +706,7 @@ export function PersonLedgerWorkspace() {
                   <div className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-1.5">
                     <p className="text-[10px] font-medium text-amber-500">Dena baki</p>
                     <p className="font-mono text-sm font-bold text-amber-700">
-                      {formatCurrency(person.netPayable)}
+                      {formatMoney(person.netPayable, currency)}
                     </p>
                   </div>
                 ) : (

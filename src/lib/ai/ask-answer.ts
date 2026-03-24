@@ -7,6 +7,11 @@ import {
   type AskAiResponse,
 } from "@/lib/ai/ask-contract";
 import { getAskAiFacts, type AskAiFacts } from "@/lib/ai/ask-facts";
+import {
+  getAskAiHybridMatches,
+  syncAskAiDocuments,
+  type AskAiRetrievedMatch,
+} from "@/lib/ai/ask-retrieval";
 import { extractStructuredText } from "@/lib/ai/openai-utils";
 import { serverEnv } from "@/lib/env/server";
 
@@ -62,30 +67,43 @@ function buildAskSystemPrompt(language: AskAiReplyLanguage): string {
     "You answer questions about the user's saved money records.",
     "",
     "RULES:",
-    "1. Use ONLY the provided structured facts to answer. NEVER invent numbers, people, balances, or loan states.",
-    "2. If the facts are insufficient to answer clearly, say so honestly instead of guessing.",
-    "3. Keep answers short, direct, and useful — 2 to 4 sentences max.",
-    "4. When answering about balance/kitna bacha, use net cash movement from facts and clearly say it is based on saved records, not bank balance.",
-    "5. When answering about loans/udhaar, use the pendingLoans array and mention specific people and amounts.",
-    "6. When answering about expenses/kharcha, break down by category if category data is available in topSpendingCategory or recentEntries.",
-    "7. When answering about income/aamdani, use cashInTotal from the summary.",
-    "8. Understand follow-up questions — use the conversation history to maintain context.",
-    "9. If the user asks about a specific person, filter your answer to that person's data from the facts.",
-    "10. If the user asks about last transaction/latest entry, use the recentEntries array.",
-    "11. If asked to compare periods, use the data available and be honest about what you can see.",
+    "1. Use ONLY the provided data packs to answer. Never invent numbers, people, balances, reminders, or loan states.",
+    "2. Structured facts are the source of truth for exact totals, counts, balances, pending amounts, and period summaries.",
+    "3. Semantic matches are supporting memory snippets from saved entries and reminders. Use them for context and recall, but never let them override structured facts.",
+    "4. If the available data is insufficient to answer clearly, say so honestly instead of guessing.",
+    "5. Keep answers short, direct, and useful - 2 to 4 sentences max.",
+    "6. When answering about balance or kitna bacha, use net cash movement from facts and clearly say it is based on saved records, not bank balance.",
+    "7. When answering about loans or udhaar, use pendingLoans and mention specific people and amounts.",
+    "8. When answering about expenses or kharcha, use categories and recent entries when helpful.",
+    "9. When answering about income or aamdani, use cashInTotal from the summary.",
+    "10. Understand follow-up questions and use the recent conversation context.",
+    "11. If the user asks about a specific person or category, focus on that filter from the facts.",
+    "12. If the user asks about latest or recent activity, use recentEntries first and semantic matches second.",
     "",
     "ANSWER FORMAT:",
-    "- answerText: The main natural language answer.",
-    "- factualPoints: Up to 6 key data points used in your answer (for transparency).",
-    "- uncertaintyNote: If the answer is an estimate or data is limited, note it. Otherwise null.",
+    "- answerText: the main natural-language answer.",
+    "- factualPoints: up to 6 short bullet-like data points used in the answer.",
+    "- uncertaintyNote: mention limits only when needed, otherwise null.",
     "",
     `LANGUAGE: ${buildLanguageInstruction(language)}`,
   ].join("\n");
 }
 
+function buildSemanticMatchesPayload(matches: AskAiRetrievedMatch[]) {
+  return matches.slice(0, 5).map((match) => ({
+    sourceType: match.sourceType,
+    sourceId: match.sourceId,
+    finalScore: Number(match.finalScore.toFixed(3)),
+    textRank: Number(match.textRank.toFixed(3)),
+    vectorRank: Number(match.vectorRank.toFixed(3)),
+    content: match.content,
+    metadata: match.metadata,
+  }));
+}
 
 async function askWithOpenAI(
   facts: AskAiFacts,
+  semanticMatches: AskAiRetrievedMatch[],
   conversation: AskAiConversationMessage[],
   originalQuestion: string,
   replyLanguage: AskAiReplyLanguage,
@@ -122,6 +140,7 @@ async function askWithOpenAI(
               recentEntries: facts.recentEntries,
               totalMatchingEntries: facts.totalMatchingEntries,
             },
+            semanticMatches: buildSemanticMatchesPayload(semanticMatches),
           }),
         },
       ],
@@ -181,7 +200,7 @@ export async function answerAskAiQuestion(params: {
     serverEnv.OPENAI_API_KEY.includes("replace-with")
   ) {
     throw new Error(
-      "AI service is not configured. Please set a valid OpenAI API key to use this feature."
+      "AI service is not configured. Please set a valid OpenAI API key to use this feature.",
     );
   }
 
@@ -196,8 +215,23 @@ export async function answerAskAiQuestion(params: {
     timeZone: request.timezone,
   });
 
-  return await askWithOpenAI(
+  let semanticMatches: AskAiRetrievedMatch[] = [];
+
+  try {
+    await syncAskAiDocuments(params.userId);
+    semanticMatches = await getAskAiHybridMatches({
+      userId: params.userId,
+      question: effectiveQuestion,
+    });
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("Ask AI hybrid retrieval skipped:", error);
+    }
+  }
+
+  return askWithOpenAI(
     facts,
+    semanticMatches,
     request.conversation,
     request.question,
     request.replyLanguage,

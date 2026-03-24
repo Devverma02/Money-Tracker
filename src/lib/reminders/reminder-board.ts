@@ -84,6 +84,34 @@ export async function refreshReminderStatuses(userId: string, now = new Date()) 
   ]);
 }
 
+export async function refreshAllReminderStatuses(now = new Date()) {
+  await Promise.all([
+    prisma.reminder.updateMany({
+      where: {
+        status: ReminderStatus.PENDING,
+        dueAt: {
+          lt: now,
+        },
+      },
+      data: {
+        status: ReminderStatus.OVERDUE,
+      },
+    }),
+    prisma.reminder.updateMany({
+      where: {
+        status: ReminderStatus.SNOOZED,
+        snoozeUntil: {
+          lt: now,
+        },
+      },
+      data: {
+        status: ReminderStatus.OVERDUE,
+        snoozeUntil: null,
+      },
+    }),
+  ]);
+}
+
 export async function getReminderBoard(
   userId: string,
   timeZone: string,

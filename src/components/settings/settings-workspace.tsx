@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
+  CurrencyCodeValue,
   EntryInputPreferenceValue,
   PreferredLanguageValue,
   SettingsResponse,
 } from "@/lib/settings/settings-contract";
+import { currencyOptions } from "@/lib/settings/currency";
 
 type SettingsWorkspaceProps = {
   settings: SettingsResponse;
@@ -33,6 +35,9 @@ export function SettingsWorkspace({ settings }: SettingsWorkspaceProps) {
     settings.preferredLanguage,
   );
   const [timezone, setTimezone] = useState(settings.timezone);
+  const [preferredCurrency, setPreferredCurrency] = useState<CurrencyCodeValue>(
+    settings.preferredCurrency,
+  );
   const [voiceRepliesEnabled, setVoiceRepliesEnabled] = useState(
     settings.voiceRepliesEnabled,
   );
@@ -109,6 +114,7 @@ export function SettingsWorkspace({ settings }: SettingsWorkspaceProps) {
             displayName,
             preferredLanguage,
             timezone,
+            preferredCurrency,
             voiceRepliesEnabled,
             reminderDefaultTime,
             preferredEntryInput,
@@ -274,6 +280,25 @@ export function SettingsWorkspace({ settings }: SettingsWorkspaceProps) {
                 {timezoneChoices.map((option) => (
                   <option key={option} value={option}>
                     {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-600">
+                Currency
+              </label>
+              <select
+                value={preferredCurrency}
+                onChange={(event) =>
+                  setPreferredCurrency(event.target.value as CurrencyCodeValue)
+                }
+                className="field"
+              >
+                {currencyOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} ({option.value})
                   </option>
                 ))}
               </select>

@@ -24,3 +24,10 @@ export type ReminderBoard = {
   };
   helperText: string;
 };
+
+export type ReminderDraftSeed = {
+  title: string;
+  linkedPerson: string;
+  dueDate: string;
+  dueTime: string;
+};

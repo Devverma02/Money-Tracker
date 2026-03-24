@@ -76,6 +76,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         email: profile.email ?? null,
         preferredLanguage: profile.preferredLanguage ?? "HINGLISH",
         timezone: profile.timezone ?? "Asia/Kolkata",
+        preferredCurrency: profile.preferredCurrency ?? "INR",
         voiceRepliesEnabled: profile.voiceRepliesEnabled ?? true,
         reminderDefaultTime: profile.reminderDefaultTime ?? "09:00",
         preferredEntryInput: profile.preferredEntryInput ?? "TYPING",

@@ -7,10 +7,6 @@ function normalizeRuntimeDatabaseUrl(rawUrl: string) {
     if (!url.searchParams.has("pgbouncer")) {
       url.searchParams.set("pgbouncer", "true");
     }
-
-    if (!url.searchParams.has("connection_limit")) {
-      url.searchParams.set("connection_limit", "1");
-    }
   }
 
   return url.toString();
@@ -24,6 +20,8 @@ const serverEnvSchema = z.object({
   OPENAI_API_KEY: z.string().optional().default(""),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   STT_PROVIDER: z.string().default("openai"),
+  VAPID_PRIVATE_KEY: z.string().optional().default(""),
+  CRON_SECRET: z.string().optional().default(""),
 });
 
 export const serverEnv = serverEnvSchema.parse({
@@ -36,4 +34,6 @@ export const serverEnv = serverEnvSchema.parse({
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   OPENAI_MODEL: process.env.OPENAI_MODEL,
   STT_PROVIDER: process.env.STT_PROVIDER,
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+  CRON_SECRET: process.env.CRON_SECRET,
 });

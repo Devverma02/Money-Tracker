@@ -73,7 +73,7 @@ function getNameTokens(value: string) {
     .filter(Boolean);
 }
 
-function isShortLongNameVariant(left: string, right: string) {
+export function isShortLongNameVariant(left: string, right: string) {
   const leftTokens = getNameTokens(left);
   const rightTokens = getNameTokens(right);
 

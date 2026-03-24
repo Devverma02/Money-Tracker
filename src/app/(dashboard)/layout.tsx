@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
@@ -17,6 +18,21 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  const profile = await prisma.appProfile.findUnique({
+    where: {
+      id: user.id,
+    },
+    select: {
+      displayName: true,
+    },
+  });
+  const userLabel =
+    profile?.displayName?.trim() ||
+    user.user_metadata.full_name ||
+    user.user_metadata.name ||
+    user.email?.split("@")[0] ||
+    "User";
+
   return (
     <>
       <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
@@ -26,7 +42,10 @@ export default async function DashboardLayout({
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0d9488] text-xs font-bold text-white">
                 MM
               </div>
-              <span className="text-sm font-semibold text-gray-900">MoneyManage</span>
+              <div>
+                <span className="block text-sm font-semibold text-gray-900">MoneyManage</span>
+                <span className="block text-xs text-gray-400">{userLabel}</span>
+              </div>
             </div>
 
             <div className="hidden items-center gap-2 lg:flex">

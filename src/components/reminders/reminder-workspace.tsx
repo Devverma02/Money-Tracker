@@ -1,7 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
+import {
+  combineDateTimeInTimeZone,
+  getTimeZoneDateInput,
+} from "@/lib/dates/timezone-datetime";
 import {
   getSpeechLocaleForLanguage,
   type PreferredLanguageValue,
@@ -11,7 +15,11 @@ import type {
   CreateReminderResponse,
   ReminderMutationResponse,
 } from "@/lib/reminders/reminder-contract";
-import type { ReminderBoard, ReminderItem } from "@/lib/reminders/types";
+import type {
+  ReminderBoard,
+  ReminderDraftSeed,
+  ReminderItem,
+} from "@/lib/reminders/types";
 import { getVoiceReplyContext, voiceText, type VoiceReplyContext } from "@/lib/voice/voice-localization";
 
 type ReminderWorkspaceProps = {
@@ -26,6 +34,8 @@ type ReminderWorkspaceProps = {
   onEnableAlerts?: () => void | Promise<void>;
   onDisableAlerts?: () => void;
   variant?: "dashboard" | "page";
+  initialDraftSeed?: ReminderDraftSeed | null;
+  onDraftSeedConsumed?: () => void;
 };
 
 type ReminderSectionView = "create" | "active" | "closed";
@@ -40,22 +50,6 @@ function formatReminderDate(isoString: string, timeZone: string) {
     hour12: true,
     timeZone,
   }).format(new Date(isoString));
-}
-
-function formatDateInputValue(value: Date) {
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
-}
-
-function buildLocalDate(daysAhead = 0) {
-  const base = new Date();
-  base.setDate(base.getDate() + daysAhead);
-
-  return formatDateInputValue(base);
-}
-
-function combineLocalDateTime(dateValue: string, timeValue?: string) {
-  const resolved = new Date(`${dateValue}T${timeValue || "09:00"}`);
-  return resolved.toISOString();
 }
 
 function reminderTone(item: ReminderItem) {
@@ -102,11 +96,13 @@ export function ReminderWorkspace({
   onEnableAlerts,
   onDisableAlerts,
   variant = "page",
+  initialDraftSeed = null,
+  onDraftSeedConsumed,
 }: ReminderWorkspaceProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [linkedPerson, setLinkedPerson] = useState("");
-  const [dueDate, setDueDate] = useState(buildLocalDate());
+  const [dueDate, setDueDate] = useState(() => getTimeZoneDateInput(timezone));
   const [dueTime, setDueTime] = useState(defaultReminderTime);
   const [snoozeMap, setSnoozeMap] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +126,28 @@ export function ReminderWorkspace({
         : "create",
   );
   const [createMode, setCreateMode] = useState<ReminderCreateMode>("voice");
+
+  useEffect(() => {
+    setDueDate(getTimeZoneDateInput(timezone));
+  }, [timezone]);
+
+  useEffect(() => {
+    setDueTime(defaultReminderTime);
+  }, [defaultReminderTime]);
+
+  useEffect(() => {
+    if (!initialDraftSeed) {
+      return;
+    }
+
+    setSectionView("create");
+    setCreateMode("manual");
+    setTitle(initialDraftSeed.title);
+    setLinkedPerson(initialDraftSeed.linkedPerson);
+    setDueDate(initialDraftSeed.dueDate);
+    setDueTime(initialDraftSeed.dueTime);
+    onDraftSeedConsumed?.();
+  }, [initialDraftSeed, onDraftSeedConsumed]);
 
   const visibleActiveReminders = useMemo(
     () =>
@@ -277,7 +295,11 @@ export function ReminderWorkspace({
           body: JSON.stringify({
             title,
             linkedPerson: linkedPerson || undefined,
-            dueAt: combineLocalDateTime(dueDate, dueTime),
+            dueAt: combineDateTimeInTimeZone(
+              dueDate,
+              dueTime || defaultReminderTime,
+              timezone,
+            ),
             bucket: defaultBucket,
           }),
         });
@@ -300,7 +322,7 @@ export function ReminderWorkspace({
 
         setTitle("");
         setLinkedPerson("");
-        setDueDate(buildLocalDate());
+        setDueDate(getTimeZoneDateInput(timezone));
         setDueTime(defaultReminderTime);
         setSuccess(payload.message);
         router.refresh();
@@ -399,9 +421,10 @@ export function ReminderWorkspace({
           body:
             path === "snooze"
               ? JSON.stringify({
-                  snoozeUntil: combineLocalDateTime(
-                    buildLocalDate(1),
+                  snoozeUntil: combineDateTimeInTimeZone(
+                    getTimeZoneDateInput(timezone, 1),
                     snoozeMap[reminderId] || defaultReminderTime,
+                    timezone,
                   ),
                 })
               : undefined,
@@ -455,13 +478,13 @@ export function ReminderWorkspace({
                 : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
             }`}
           >
-            {alertsEnabled ? "Browser alerts on" : "Enable browser alerts"}
+            {alertsEnabled ? "Push alerts on" : "Enable push alerts"}
           </button>
         </div>
 
         {notificationPermission === "denied" ? (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Browser notifications are blocked. Allow notifications in the browser to get reminder alerts.
+            Push notifications are blocked. Allow notifications in the browser to receive reminders even when the tab is closed.
           </p>
         ) : null}
 

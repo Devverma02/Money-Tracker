@@ -5,6 +5,7 @@ import {
   addPersonAlias,
   getPersonDetail,
   getPersonList,
+  getPersonMergeSuggestions,
   renamePerson,
 } from "@/lib/persons/person-book";
 
@@ -42,7 +43,12 @@ export async function GET(request: Request) {
       return NextResponse.json(await getPersonDetail(user.id, personId));
     }
 
-    return NextResponse.json({ persons: await getPersonList(user.id) });
+    const [persons, mergeSuggestions] = await Promise.all([
+      getPersonList(user.id),
+      getPersonMergeSuggestions(user.id),
+    ]);
+
+    return NextResponse.json({ persons, mergeSuggestions });
   } catch (error) {
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 400 });

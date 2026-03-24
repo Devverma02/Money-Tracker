@@ -1,6 +1,9 @@
 import { EntryType } from "@prisma/client";
 import { prisma as prismaClient } from "@/lib/prisma";
-import { normalizePersonLookup } from "@/lib/persons/person-resolution";
+import {
+  isShortLongNameVariant,
+  normalizePersonLookup,
+} from "@/lib/persons/person-resolution";
 
 export type PersonSummary = {
   personId: string;
@@ -42,6 +45,14 @@ export type PersonDetail = {
     transactionCount: number;
   };
   transactions: PersonTransaction[];
+};
+
+export type PersonMergeSuggestion = {
+  sourcePersonId: string;
+  sourcePersonName: string;
+  targetPersonId: string;
+  targetPersonName: string;
+  reason: string;
 };
 
 type PersonRecord = {
@@ -188,6 +199,52 @@ export async function getPersonList(userId: string) {
   return summaries
     .filter((person) => person.transactionCount > 0)
     .sort((a, b) => b.netReceivable + b.netPayable - (a.netReceivable + a.netPayable));
+}
+
+export async function getPersonMergeSuggestions(userId: string) {
+  const people = await loadPeople(userId);
+  const suggestions = new Map<string, PersonMergeSuggestion>();
+
+  for (let index = 0; index < people.length; index += 1) {
+    const current = people[index];
+
+    for (let compareIndex = index + 1; compareIndex < people.length; compareIndex += 1) {
+      const candidate = people[compareIndex];
+
+      if (
+        !isShortLongNameVariant(current.displayName, candidate.displayName) &&
+        !candidate.aliases.some((alias) => isShortLongNameVariant(alias, current.displayName)) &&
+        !current.aliases.some((alias) => isShortLongNameVariant(alias, candidate.displayName))
+      ) {
+        continue;
+      }
+
+      const currentTokenCount = normalizePersonLookup(current.displayName).split(" ").filter(Boolean).length;
+      const candidateTokenCount = normalizePersonLookup(candidate.displayName).split(" ").filter(Boolean).length;
+      const currentIsTarget =
+        currentTokenCount > candidateTokenCount ||
+        (currentTokenCount === candidateTokenCount &&
+          current.displayName.length >= candidate.displayName.length);
+
+      const target = currentIsTarget ? current : candidate;
+      const source = currentIsTarget ? candidate : current;
+      const key = `${source.id}:${target.id}`;
+
+      if (suggestions.has(key)) {
+        continue;
+      }
+
+      suggestions.set(key, {
+        sourcePersonId: source.id,
+        sourcePersonName: source.displayName,
+        targetPersonId: target.id,
+        targetPersonName: target.displayName,
+        reason: `${source.displayName} short name lag raha hai, aur ${target.displayName} uska full name ho sakta hai.`,
+      });
+    }
+  }
+
+  return Array.from(suggestions.values()).slice(0, 8);
 }
 
 export async function getPersonDetail(userId: string, personId: string) {
