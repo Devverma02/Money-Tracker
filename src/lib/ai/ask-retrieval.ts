@@ -353,7 +353,7 @@ export async function getAskAiHybridMatches(params: {
       ${queryText},
       ${embeddingLiteral}::vector,
       ${params.userId}::uuid,
-      ${matchCount}
+      ${matchCount}::int
     )
   `);
 

@@ -19,6 +19,8 @@ export const askAiResponseSchema = z.object({
   factualPoints: z.array(z.string().min(1)).max(6),
   uncertaintyNote: z.string().nullable(),
   parserMode: z.enum(["openai", "deterministic"]),
+  retrievalMode: z.enum(["hybrid", "facts-only"]),
+  retrievalMatchCount: z.number().int().min(0).max(20),
   resolvedPeriod: z.enum(["today", "week", "month", "year", "overall", "custom"]),
   resolvedPeriodLabel: z.string().min(1),
 });
@@ -43,22 +45,10 @@ export const askAiJsonSchema = {
     uncertaintyNote: {
       anyOf: [{ type: "string" }, { type: "null" }],
     },
-    parserMode: {
-      type: "string",
-      enum: ["openai", "deterministic"],
-    },
-    resolvedPeriod: {
-      type: "string",
-      enum: ["today", "week", "month", "year", "overall", "custom"],
-    },
-    resolvedPeriodLabel: { type: "string" },
   },
   required: [
     "answerText",
     "factualPoints",
     "uncertaintyNote",
-    "parserMode",
-    "resolvedPeriod",
-    "resolvedPeriodLabel",
   ],
 } as const;

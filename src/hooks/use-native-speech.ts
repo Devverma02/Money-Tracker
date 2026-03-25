@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 type UseNativeSpeechOptions = {
   locale?: string;
@@ -35,7 +35,7 @@ export function useNativeSpeech(options: UseNativeSpeechOptions = {}) {
     () => false,
   );
 
-  const speakText = (
+  const speakText = useCallback((
     text: string,
     language = "en-IN",
     onEnd?: () => void,
@@ -57,9 +57,9 @@ export function useNativeSpeech(options: UseNativeSpeechOptions = {}) {
       onEnd?.();
     };
     window.speechSynthesis.speak(utterance);
-  };
+  }, []);
 
-  const startListening = () => {
+  const startListening = useCallback(() => {
     if (typeof window === "undefined") {
       setError("This browser does not support microphone capture.");
       return;
@@ -141,11 +141,11 @@ export function useNativeSpeech(options: UseNativeSpeechOptions = {}) {
       setIsListening(false);
       setError("Speech recognition could not start.");
     }
-  };
+  }, [locale]);
 
-  const stopListening = () => {
+  const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
-  };
+  }, []);
 
   return {
     isSupported,

@@ -28,6 +28,25 @@ function createMessageId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function getRetrievalBadge(meta: AskAiResponse) {
+  if (meta.retrievalMode === "hybrid") {
+    return {
+      label: "Hybrid retrieval",
+      detail:
+        meta.retrievalMatchCount === 1
+          ? "1 semantic match"
+          : `${meta.retrievalMatchCount} semantic matches`,
+      className: "border-teal-200 bg-teal-50 text-teal-700",
+    };
+  }
+
+  return {
+    label: "Facts only",
+    detail: "Structured facts path",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+  };
+}
+
 type AskAiWorkspaceProps = {
   timezone: string;
   preferredLanguage: PreferredLanguageValue;
@@ -439,6 +458,27 @@ export function AskAiWorkspace({
                           </div>
                         ) : null}
 
+                        {message.role === "assistant" && message.answerMeta ? (
+                          <div className="mt-3 border-t border-gray-200 pt-3">
+                            {(() => {
+                              const retrievalBadge = getRetrievalBadge(
+                                message.answerMeta,
+                              );
+
+                              return (
+                                <div
+                                  className={`inline-flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${retrievalBadge.className}`}
+                                >
+                                  <span>{retrievalBadge.label}</span>
+                                  <span className="opacity-80">
+                                    {retrievalBadge.detail}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ) : null}
+
                         {message.role === "assistant" && message.answerMeta?.uncertaintyNote ? (
                           <div className="mt-3 border-t border-gray-200 pt-3">
                             <div className="status-warn rounded-lg border px-3 py-2 text-xs">
@@ -607,7 +647,27 @@ export function AskAiWorkspace({
                             : "border border-gray-200 bg-white text-gray-900"
                         }`}
                       >
-                        {message.text}
+                        <p>{message.text}</p>
+                        {message.role === "assistant" && message.answerMeta ? (
+                          <div className="mt-3">
+                            {(() => {
+                              const retrievalBadge = getRetrievalBadge(
+                                message.answerMeta,
+                              );
+
+                              return (
+                                <div
+                                  className={`inline-flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${retrievalBadge.className}`}
+                                >
+                                  <span>{retrievalBadge.label}</span>
+                                  <span className="opacity-80">
+                                    {retrievalBadge.detail}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        ) : null}
                       </div>
                     ))}
                   </div>

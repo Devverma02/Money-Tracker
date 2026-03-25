@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { publicEnv } from "@/lib/env/public";
 
 const ALERTS_STORAGE_KEY = "moneymanage.reminder-alerts-enabled";
@@ -16,6 +16,22 @@ const serverSnapshot: ReminderAlertsSnapshot = {
   permission: "default",
   isSupported: false,
 };
+
+function readReminderAlertsSnapshot(hasVapidKey: boolean): ReminderAlertsSnapshot {
+  if (typeof window === "undefined") {
+    return serverSnapshot;
+  }
+
+  return {
+    enabled: window.localStorage.getItem(ALERTS_STORAGE_KEY) === "true",
+    permission: typeof Notification === "undefined" ? "denied" : Notification.permission,
+    isSupported:
+      hasVapidKey &&
+      "serviceWorker" in navigator &&
+      "PushManager" in window &&
+      "Notification" in window,
+  };
+}
 
 function base64UrlToUint8Array(base64Url: string) {
   const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
@@ -35,26 +51,20 @@ async function registerReminderServiceWorker() {
 
 export function useReminderAlerts() {
   const hasVapidKey = Boolean(publicEnv.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
-  const snapshot = useSyncExternalStore(
-    () => () => {},
-    () => {
-      if (typeof window === "undefined") {
-        return serverSnapshot;
-      }
+  const [snapshot, setSnapshot] = useState<ReminderAlertsSnapshot>(serverSnapshot);
 
-      return {
-        enabled: window.localStorage.getItem(ALERTS_STORAGE_KEY) === "true",
-        permission:
-          typeof Notification === "undefined" ? "denied" : Notification.permission,
-        isSupported:
-          hasVapidKey &&
-          "serviceWorker" in navigator &&
-          "PushManager" in window &&
-          "Notification" in window,
-      } satisfies ReminderAlertsSnapshot;
-    },
-    () => serverSnapshot,
-  );
+  useEffect(() => {
+    const refreshSnapshot = () => {
+      setSnapshot(readReminderAlertsSnapshot(hasVapidKey));
+    };
+
+    refreshSnapshot();
+    window.addEventListener("storage", refreshSnapshot);
+
+    return () => {
+      window.removeEventListener("storage", refreshSnapshot);
+    };
+  }, [hasVapidKey]);
 
   useEffect(() => {
     if (!snapshot.isSupported || snapshot.permission !== "granted" || !snapshot.enabled) {
@@ -126,6 +136,7 @@ export function useReminderAlerts() {
     });
 
     window.localStorage.setItem(ALERTS_STORAGE_KEY, "true");
+    setSnapshot(readReminderAlertsSnapshot(hasVapidKey));
   };
 
   const disableAlerts = async () => {
@@ -154,6 +165,7 @@ export function useReminderAlerts() {
     }
 
     window.localStorage.setItem(ALERTS_STORAGE_KEY, "false");
+    setSnapshot(readReminderAlertsSnapshot(hasVapidKey));
   };
 
   return {

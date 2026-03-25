@@ -176,6 +176,8 @@ async function askWithOpenAI(
   return askAiResponseSchema.parse({
     ...parsed,
     parserMode: "openai",
+    retrievalMode: semanticMatches.length > 0 ? "hybrid" : "facts-only",
+    retrievalMatchCount: semanticMatches.length,
     resolvedPeriod: facts.resolvedPeriod,
     resolvedPeriodLabel: facts.resolvedPeriodLabel,
   });
