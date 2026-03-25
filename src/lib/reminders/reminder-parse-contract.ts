@@ -5,6 +5,8 @@ export const reminderParseRequestSchema = z.object({
   locale: z.string().default("hi-IN"),
   timezone: z.string().default("Asia/Kolkata"),
   bucket: z.string().trim().min(1).default("personal"),
+  knownPeople: z.array(z.string().trim().min(1).max(120)).max(120).default([]),
+  knownCategories: z.array(z.string().trim().min(1).max(120)).max(120).default([]),
 });
 
 export const parsedReminderDraftSchema = z.object({

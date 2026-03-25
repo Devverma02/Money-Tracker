@@ -1,4 +1,5 @@
 import { serverEnv } from "@/lib/env/server";
+import { buildAiRuntimeContext } from "@/lib/ai/runtime-context";
 import {
   reminderParseRequestSchema,
   reminderParseResultSchema,
@@ -7,6 +8,10 @@ import {
   type ReminderParseRequest,
   type ReminderParseResult,
 } from "@/lib/reminders/reminder-parse-contract";
+import {
+  containsAnyNormalizedTerm,
+  normalizeSearchText,
+} from "@/lib/text/unicode-search";
 
 function extractStructuredText(payload: unknown) {
   if (
@@ -177,7 +182,7 @@ function titleCase(value: string) {
 
 function detectPersonName(text: string) {
   const patterns = [
-    /\b([A-Za-z][A-Za-z\s]{1,30}?)\s+(?:ko|se)\b/i,
+    /([\p{L}][\p{L}\s]{1,30}?)\s+(?:ko|se)\b/iu,
     /\bwith\s+([A-Za-z][A-Za-z\s]{1,30}?)(?:\s|$)/i,
     /\bfor\s+([A-Za-z][A-Za-z\s]{1,30}?)(?:\s|$)/i,
   ];
@@ -257,7 +262,7 @@ function resolveFutureWeekday(text: string, timeZone: string) {
 }
 
 function resolveReminderDate(text: string, timeZone: string) {
-  const normalized = text.toLowerCase();
+  const normalized = normalizeSearchText(text);
   const now = new Date();
   const local = getLocalDateParts(now, timeZone);
   const base = zonedDateTimeToUtc(local.year, local.month, local.day, 0, 0, 0, timeZone);
@@ -347,7 +352,7 @@ function resolveReminderDate(text: string, timeZone: string) {
     } satisfies ResolvedReminderDate;
   }
 
-  if (/\b(day after tomorrow|parso)\b/.test(normalized)) {
+  if (containsAnyNormalizedTerm(normalized, ["day after tomorrow", "parso", "परसों"])) {
     const target = addDays(base, 2);
     const parts = getLocalDateParts(target, timeZone);
 
@@ -359,7 +364,7 @@ function resolveReminderDate(text: string, timeZone: string) {
     } satisfies ResolvedReminderDate;
   }
 
-  if (/\b(tomorrow|kal)\b/.test(normalized)) {
+  if (containsAnyNormalizedTerm(normalized, ["tomorrow", "kal", "कल"])) {
     const target = addDays(base, 1);
     const parts = getLocalDateParts(target, timeZone);
 
@@ -371,7 +376,7 @@ function resolveReminderDate(text: string, timeZone: string) {
     } satisfies ResolvedReminderDate;
   }
 
-  if (/\b(today|aaj)\b/.test(normalized)) {
+  if (containsAnyNormalizedTerm(normalized, ["today", "aaj", "आज"])) {
     return {
       year: local.year,
       month: local.month,
@@ -391,7 +396,7 @@ type ResolvedReminderTime = {
 };
 
 function resolveReminderTime(text: string) {
-  const normalized = text.toLowerCase();
+  const normalized = normalizeSearchText(text);
   const explicitTimePatterns = [
     /\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/,
     /\b(\d{1,2})\s*(am|pm)\b/,
@@ -421,9 +426,9 @@ function resolveReminderTime(text: string) {
     }
 
     if (!meridiem) {
-      if (/\b(shaam|evening|raat|night)\b/.test(normalized) && hour < 12) {
+      if (containsAnyNormalizedTerm(normalized, ["shaam", "evening", "raat", "night", "शाम", "रात"]) && hour < 12) {
         hour += 12;
-      } else if (/\b(dopahar|afternoon)\b/.test(normalized) && hour < 12) {
+      } else if (containsAnyNormalizedTerm(normalized, ["dopahar", "afternoon", "दोपहर"]) && hour < 12) {
         hour = hour === 12 ? 12 : hour + 12;
       }
     }
@@ -443,10 +448,10 @@ function resolveReminderTime(text: string) {
   }
 
   const generalTimes: Array<[RegExp, number, string]> = [
-    [/\b(subah|morning)\b/, 9, "morning"],
-    [/\b(dopahar|afternoon)\b/, 14, "afternoon"],
-    [/\b(shaam|evening)\b/, 18, "evening"],
-    [/\b(raat|night)\b/, 21, "night"],
+    [/(subah|morning|सुबह)/i, 9, "morning"],
+    [/(dopahar|afternoon|दोपहर)/i, 14, "afternoon"],
+    [/(shaam|evening|शाम)/i, 18, "evening"],
+    [/(raat|night|रात)/i, 21, "night"],
   ];
 
   for (const [pattern, hour, label] of generalTimes) {
@@ -467,6 +472,7 @@ function cleanReminderTitle(text: string) {
   const cleaned = normalizeWhitespace(
     text
       .replace(/\b(today|tomorrow|day after tomorrow|aaj|kal|parso)\b/gi, " ")
+      .replace(/(आज|कल|परसों)/g, " ")
       .replace(/\b(next|agla|agle)\s+(monday|mon|tuesday|tue|wednesday|wed|thursday|thu|friday|fri|saturday|sat|sunday|sun)\b/gi, " ")
       .replace(/\b\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b/g, " ")
       .replace(/\b\d{1,2}\s+(?:january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|sept|october|oct|november|nov|december|dec)(?:\s+20\d{2})?\b/gi, " ")
@@ -521,7 +527,7 @@ function parseReminderInputHeuristically(request: ReminderParseRequest): Reminde
 
   const assumedTime = !time;
 
-  if (!time && /\b(today|aaj)\b/i.test(normalizedText)) {
+  if (!time && containsAnyNormalizedTerm(normalizedText, ["today", "aaj", "आज"])) {
     return buildReminderParseResult({
       draft: null,
       confidence: 0.44,
@@ -594,18 +600,25 @@ async function parseReminderWithOpenAI(request: ReminderParseRequest) {
     "Return only schema-valid JSON.",
     "Extract a single reminder draft with title, dueAt, dueLabel, linkedPerson, bucket, assumedTime, and sourceText.",
     "The reminder must only be save-ready when dueAt is a clear future datetime in the user's timezone.",
+    "Use the provided runtime context with current local date/time to resolve relative phrases like today, kal, parso, next Monday, and this evening.",
     "If the date or time is unclear, set draft=null, needsClarification=true, and ask one short Hinglish clarification question.",
     "If the user gives a future date without a time, you may assume 09:00 local time and set assumedTime=true.",
     "Keep the title concise, factual, and derived from the user's wording.",
     "Never invent people or dates.",
+    "Use the provided knownPeople and knownCategories as candidate hints. If one clearly matches, prefer that exact person string.",
   ].join(" ");
+
+  const runtimeContext = buildAiRuntimeContext({
+    timezone: request.timezone,
+    locale: request.locale,
+  });
 
   const userPrompt = JSON.stringify({
     raw_text: request.inputText,
-    locale: request.locale,
-    timezone: request.timezone,
+    runtimeContext,
     bucket: request.bucket,
-    now: new Date().toISOString(),
+    knownPeople: request.knownPeople,
+    knownCategories: request.knownCategories,
   });
 
   const response = await fetch("https://api.openai.com/v1/responses", {

@@ -27,9 +27,9 @@ export async function PublicHeader() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0d9488] text-xs font-bold text-white">
-            MM
+            JK
           </span>
-          <span className="text-sm font-semibold text-gray-900">MoneyManage</span>
+          <span className="text-sm font-semibold text-gray-900">JebKitab</span>
         </Link>
 
         <div className="hidden items-center gap-6 lg:flex">

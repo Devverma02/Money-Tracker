@@ -1,9 +1,13 @@
 import { EntryType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { AskAiInterpretation } from "@/lib/ai/ask-interpret-contract";
+import { getTrackedBalanceBreakdown } from "@/lib/ledger/tracked-balance";
+import { getOpeningLoanPositions } from "@/lib/setup/setup";
 import {
   resolveAskDateRange,
   type ResolvedAskPeriod,
 } from "@/lib/dates/natural-date";
+import { containsNormalizedTerm } from "@/lib/text/unicode-search";
 
 export type AskAiFacts = {
   question: string;
@@ -11,6 +15,12 @@ export type AskAiFacts = {
   resolvedPeriodLabel: string;
   appliedPersonFilter: string | null;
   appliedCategoryFilter: string | null;
+  trackedBalance: {
+    openingBalance: number;
+    currentBalance: number;
+    cashInSinceSetup: number;
+    cashOutSinceSetup: number;
+  };
   summary: {
     label: string;
     cashInTotal: number;
@@ -59,10 +69,6 @@ const categoryAliases: Array<{ canonical: string; patterns: RegExp[] }> = [
   { canonical: "income", patterns: [/\b(income|salary|aamdani|kamai)\b/i] },
   { canonical: "savings", patterns: [/\b(savings|saving|bachat|deposit)\b/i] },
 ];
-
-function normalizeFreeText(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
 
 function titleCase(value: string) {
   return value
@@ -121,6 +127,11 @@ function computePendingLoans(
     amount: number;
     entryType: EntryType;
   }>,
+  openingPositions: Array<{
+    personName: string;
+    amount: number;
+    direction: "RECEIVABLE" | "PAYABLE";
+  }> = [],
 ) {
   const people = new Map<string, { personName: string; receivable: number; payable: number }>();
 
@@ -151,6 +162,28 @@ function computePendingLoans(
 
     if (entry.entryType === EntryType.LOAN_REPAID) {
       current.payable -= entry.amount;
+    }
+
+    people.set(personName, current);
+  }
+
+  for (const item of openingPositions) {
+    const personName = normalizeEntityName(item.personName);
+
+    if (!personName) {
+      continue;
+    }
+
+    const current = people.get(personName) ?? {
+      personName,
+      receivable: 0,
+      payable: 0,
+    };
+
+    if (item.direction === "RECEIVABLE") {
+      current.receivable += item.amount;
+    } else {
+      current.payable += item.amount;
     }
 
     people.set(personName, current);
@@ -195,12 +228,8 @@ function computeTopSpendingCategory(
 }
 
 function findQuestionPersonFilter(question: string, personNames: string[]) {
-  const normalizedQuestion = normalizeFreeText(question);
-
   for (const personName of personNames) {
-    const normalizedPersonName = normalizeFreeText(personName);
-
-    if (normalizedPersonName && normalizedQuestion.includes(normalizedPersonName)) {
+    if (containsNormalizedTerm(question, personName)) {
       return personName;
     }
   }
@@ -209,12 +238,8 @@ function findQuestionPersonFilter(question: string, personNames: string[]) {
 }
 
 function findQuestionCategoryFilter(question: string, categories: string[]) {
-  const normalizedQuestion = normalizeFreeText(question);
-
   for (const category of categories) {
-    const normalizedCategory = normalizeFreeText(category);
-
-    if (normalizedCategory && normalizedQuestion.includes(normalizedCategory)) {
+    if (containsNormalizedTerm(question, category)) {
       return category;
     }
   }
@@ -230,10 +255,15 @@ export async function getAskAiFacts(params: {
   userId: string;
   question: string;
   timeZone: string;
+  interpretation?: AskAiInterpretation | null;
 }) {
-  const { userId, question, timeZone } = params;
-  const resolvedRange = resolveAskDateRange(question, timeZone);
-  const rawEntries = await prisma.ledgerEntry.findMany({
+  const { userId, question, timeZone, interpretation } = params;
+  const resolvedRange = resolveAskDateRange(
+    interpretation?.periodQuery?.trim() || question,
+    timeZone,
+  );
+  const [rawEntries, openingPositions, trackedBalance] = await Promise.all([
+    prisma.ledgerEntry.findMany({
     where: {
       userId,
       ...(resolvedRange.start && resolvedRange.endExclusive
@@ -256,7 +286,10 @@ export async function getAskAiFacts(params: {
     orderBy: {
       entryDate: "desc",
     },
-  });
+    }),
+    getOpeningLoanPositions(userId),
+    getTrackedBalanceBreakdown(userId, timeZone),
+  ]);
 
   const entries = rawEntries.map((entry) => ({
     amount: entry.amount.toNumber(),
@@ -267,32 +300,47 @@ export async function getAskAiFacts(params: {
     note: entry.note,
   }));
 
-  const appliedPersonFilter = findQuestionPersonFilter(
-    question,
-    Array.from(
-      new Set(
-        entries
-          .map((entry) => entry.personName)
-          .filter((value): value is string => Boolean(value)),
+  const appliedPersonFilter =
+    interpretation?.personFilter?.trim() ||
+    findQuestionPersonFilter(
+      question,
+      Array.from(
+        new Set(
+          entries
+            .map((entry) => entry.personName)
+            .filter((value): value is string => Boolean(value)),
+        ),
       ),
-    ),
-  );
-  const appliedCategoryFilter = findQuestionCategoryFilter(
-    question,
-    Array.from(
-      new Set(
-        entries
-          .map((entry) => entry.category)
-          .filter((value): value is string => Boolean(value)),
+    );
+  const appliedCategoryFilter =
+    interpretation?.categoryFilter?.trim() ||
+    findQuestionCategoryFilter(
+      question,
+      Array.from(
+        new Set(
+          entries
+            .map((entry) => entry.category)
+            .filter((value): value is string => Boolean(value)),
+        ),
       ),
-    ),
-  );
+    );
 
   const filteredEntries = entries.filter((entry) => {
     const personPass = appliedPersonFilter ? entry.personName === appliedPersonFilter : true;
     const categoryPass = appliedCategoryFilter ? entry.category === appliedCategoryFilter : true;
     return personPass && categoryPass;
   });
+  const filteredOpeningPositions = openingPositions
+    .map((item) => ({
+      personName: item.personName,
+      amount: item.amount.toNumber(),
+      direction: item.direction,
+    }))
+    .filter((item) =>
+      appliedPersonFilter
+        ? normalizeEntityName(item.personName) === appliedPersonFilter
+        : true,
+    );
 
   const summaryLabelParts = [resolvedRange.label];
 
@@ -310,8 +358,14 @@ export async function getAskAiFacts(params: {
     resolvedPeriodLabel: resolvedRange.label,
     appliedPersonFilter,
     appliedCategoryFilter,
+    trackedBalance: {
+      openingBalance: trackedBalance.openingBalance,
+      currentBalance: trackedBalance.currentBalance,
+      cashInSinceSetup: trackedBalance.cashInSinceSetup,
+      cashOutSinceSetup: trackedBalance.cashOutSinceSetup,
+    },
     summary: computeSummary(summaryLabelParts.join(" | "), filteredEntries),
-    pendingLoans: computePendingLoans(filteredEntries).slice(0, 8),
+    pendingLoans: computePendingLoans(filteredEntries, filteredOpeningPositions).slice(0, 8),
     topSpendingCategory: computeTopSpendingCategory(filteredEntries),
     recentEntries: filteredEntries.slice(0, 8).map((entry) => ({
       amount: entry.amount,

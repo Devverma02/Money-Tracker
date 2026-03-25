@@ -6,7 +6,29 @@ import { generateEntryNoteFromParsedAction } from "@/lib/ledger/entry-note";
 import { prisma } from "@/lib/prisma";
 import { toLedgerEntryType } from "@/lib/ledger/entry-types";
 import { resolveCategoryName } from "@/lib/categories/category-aliases";
+import { getProjectedTrackedBalanceAfterSave } from "@/lib/ledger/tracked-balance";
 import { resolvePersonNameForAction } from "@/lib/persons/person-resolution";
+
+type PreparedParsedAction = {
+  action: ParsedAction;
+  actionIndex: number;
+  generatedNote: string;
+};
+
+export class TrackedBalanceGuardError extends Error {
+  constructor(
+    public readonly details: {
+      currentBalance: number;
+      projectedBalance: number;
+      deficit: number;
+    },
+  ) {
+    super(
+      `Tracked balance is ${details.currentBalance}, so this save would go ${details.deficit} below zero.`,
+    );
+    this.name = "TrackedBalanceGuardError";
+  }
+}
 
 async function ensureBucketId(
   tx: Prisma.TransactionClient,
@@ -61,11 +83,11 @@ function validateParsedAction(action: ParsedAction) {
 async function saveParsedActionWithTx(params: {
   tx: Prisma.TransactionClient;
   user: User;
-  action: ParsedAction;
+  preparedAction: PreparedParsedAction;
   parserConfidence: number;
-  actionIndex: number;
 }) {
-  const { tx, user, action, parserConfidence, actionIndex } = params;
+  const { tx, user, preparedAction, parserConfidence } = params;
+  const { action, actionIndex, generatedNote } = preparedAction;
   const { ledgerEntryType, resolvedAmount, resolvedEntryDate } =
     validateParsedAction(action);
   const bucketId = await ensureBucketId(tx, user.id, action.bucket ?? "personal");
@@ -77,7 +99,6 @@ async function saveParsedActionWithTx(params: {
   });
   const resolvedCategory = await resolveCategoryName(user.id, action.category, tx);
   const duplicateFingerprint = createDuplicateFingerprintFromParsedAction(user.id, action);
-  const generatedNote = await generateEntryNoteFromParsedAction(action);
 
   const recentDuplicates = await tx.ledgerEntry.findMany({
     where: {
@@ -146,23 +167,57 @@ export async function saveParsedEntries(params: {
   user: User;
   actions: ParsedAction[];
   parserConfidence: number;
+  confirmBalanceOverride?: boolean;
 }) {
-  const { user, actions, parserConfidence } = params;
+  const { user, actions, parserConfidence, confirmBalanceOverride = false } = params;
 
   if (actions.length === 0) {
     throw new Error("At least one reviewed entry is required before saving.");
   }
 
+  const preparedActions: PreparedParsedAction[] = await Promise.all(
+    actions.map(async (action, actionIndex) => ({
+      action,
+      actionIndex,
+      generatedNote: await generateEntryNoteFromParsedAction(action),
+    })),
+  );
+
+  const profile = await prisma.appProfile.findUnique({
+    where: {
+      id: user.id,
+    },
+    select: {
+      timezone: true,
+      balanceGuardEnabled: true,
+    },
+  });
+
+  if ((profile?.balanceGuardEnabled ?? true) && !confirmBalanceOverride) {
+    const trackedBalance = await getProjectedTrackedBalanceAfterSave({
+      userId: user.id,
+      timeZone: profile?.timezone ?? "Asia/Kolkata",
+      actions,
+    });
+
+    if (trackedBalance.projectedBalance < 0) {
+      throw new TrackedBalanceGuardError({
+        currentBalance: trackedBalance.currentBalance,
+        projectedBalance: trackedBalance.projectedBalance,
+        deficit: Math.abs(trackedBalance.projectedBalance),
+      });
+    }
+  }
+
   const savedEntries = await prisma.$transaction(async (tx) => {
     const results = [];
 
-    for (const action of actions) {
+    for (const preparedAction of preparedActions) {
       const result = await saveParsedActionWithTx({
         tx,
         user,
-        action,
+        preparedAction,
         parserConfidence,
-        actionIndex: results.length,
       });
       results.push(result);
     }

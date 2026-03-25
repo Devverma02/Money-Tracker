@@ -6,14 +6,18 @@ import {
   type AskAiReplyLanguage,
   type AskAiResponse,
 } from "@/lib/ai/ask-contract";
+import type { AskAiInterpretation } from "@/lib/ai/ask-interpret-contract";
 import { getAskAiFacts, type AskAiFacts } from "@/lib/ai/ask-facts";
+import { interpretAskAiQuestion } from "@/lib/ai/ask-interpreter";
 import {
   getAskAiHybridMatches,
   syncAskAiDocuments,
   type AskAiRetrievedMatch,
 } from "@/lib/ai/ask-retrieval";
 import { extractStructuredText } from "@/lib/ai/openai-utils";
+import { buildAiRuntimeContext } from "@/lib/ai/runtime-context";
 import { serverEnv } from "@/lib/env/server";
+import { containsAnyNormalizedTerm } from "@/lib/text/unicode-search";
 
 function buildEffectiveQuestion(
   question: string,
@@ -26,9 +30,58 @@ function buildEffectiveQuestion(
   }
 
   const looksStandalone =
-    /\b(today|week|month|year|income|expense|spent|spend|loan|udhaar|cash|entry|entries|kitna|kitni|kitne|history|reminder|category|person|salary|aamdani|kharcha|last|recent|latest|balance|paisa|paise|rupaye)\b/i.test(
-      normalized,
-    );
+    containsAnyNormalizedTerm(normalized, [
+      "today",
+      "week",
+      "month",
+      "year",
+      "income",
+      "expense",
+      "spent",
+      "spend",
+      "loan",
+      "udhaar",
+      "cash",
+      "entry",
+      "entries",
+      "kitna",
+      "kitni",
+      "kitne",
+      "history",
+      "reminder",
+      "category",
+      "person",
+      "salary",
+      "aamdani",
+      "kharcha",
+      "last",
+      "recent",
+      "latest",
+      "balance",
+      "paisa",
+      "paise",
+      "rupaye",
+      "आज",
+      "हफ्ता",
+      "हफ्ते",
+      "महीना",
+      "महीने",
+      "साल",
+      "आय",
+      "खर्च",
+      "उधार",
+      "पैसा",
+      "पैसे",
+      "रुपये",
+      "कितना",
+      "कितनी",
+      "कितने",
+      "इतिहास",
+      "रिमाइंडर",
+      "व्यक्ति",
+      "श्रेणी",
+      "बैलेंस",
+    ]);
 
   if (looksStandalone) {
     return normalized;
@@ -72,13 +125,14 @@ function buildAskSystemPrompt(language: AskAiReplyLanguage): string {
     "3. Semantic matches are supporting memory snippets from saved entries and reminders. Use them for context and recall, but never let them override structured facts.",
     "4. If the available data is insufficient to answer clearly, say so honestly instead of guessing.",
     "5. Keep answers short, direct, and useful - 2 to 4 sentences max.",
-    "6. When answering about balance or kitna bacha, use net cash movement from facts and clearly say it is based on saved records, not bank balance.",
+    "6. When answering about current balance or kitna bacha, use trackedBalance from facts and clearly say it is based on the user's saved starting balance plus saved cash movements.",
     "7. When answering about loans or udhaar, use pendingLoans and mention specific people and amounts.",
     "8. When answering about expenses or kharcha, use categories and recent entries when helpful.",
     "9. When answering about income or aamdani, use cashInTotal from the summary.",
     "10. Understand follow-up questions and use the recent conversation context.",
     "11. If the user asks about a specific person or category, focus on that filter from the facts.",
     "12. If the user asks about latest or recent activity, use recentEntries first and semantic matches second.",
+    "13. Use the runtime context for interpreting relative time expressions like today, kal, this week, and this month.",
     "",
     "ANSWER FORMAT:",
     "- answerText: the main natural-language answer.",
@@ -107,6 +161,8 @@ async function askWithOpenAI(
   conversation: AskAiConversationMessage[],
   originalQuestion: string,
   replyLanguage: AskAiReplyLanguage,
+  runtimeContext: ReturnType<typeof buildAiRuntimeContext>,
+  interpretation: AskAiInterpretation | null,
 ): Promise<AskAiResponse> {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -127,6 +183,8 @@ async function askWithOpenAI(
           role: "user",
           content: JSON.stringify({
             currentQuestion: originalQuestion,
+            runtimeContext,
+            interpretation,
             recentConversation: conversation,
             facts: {
               question: facts.question,
@@ -134,6 +192,7 @@ async function askWithOpenAI(
               resolvedPeriodLabel: facts.resolvedPeriodLabel,
               appliedPersonFilter: facts.appliedPersonFilter,
               appliedCategoryFilter: facts.appliedCategoryFilter,
+              trackedBalance: facts.trackedBalance,
               summary: facts.summary,
               pendingLoans: facts.pendingLoans,
               topSpendingCategory: facts.topSpendingCategory,
@@ -180,6 +239,15 @@ async function askWithOpenAI(
     retrievalMatchCount: semanticMatches.length,
     resolvedPeriod: facts.resolvedPeriod,
     resolvedPeriodLabel: facts.resolvedPeriodLabel,
+    interpretation: interpretation
+      ? {
+          personFilter: interpretation.personFilter,
+          categoryFilter: interpretation.categoryFilter,
+          periodQuery: interpretation.periodQuery,
+          focus: interpretation.focus,
+          confidence: interpretation.confidence,
+        }
+      : null,
   });
 }
 
@@ -210,11 +278,28 @@ export async function answerAskAiQuestion(params: {
     request.question,
     request.conversation,
   );
+  const runtimeContext = buildAiRuntimeContext({
+    timezone: request.timezone,
+    locale: "hi-IN",
+  });
+  let interpretation: AskAiInterpretation | null = null;
+
+  try {
+    interpretation = await interpretAskAiQuestion({
+      userId: params.userId,
+      question: effectiveQuestion,
+      timezone: request.timezone,
+      locale: runtimeContext.locale,
+    });
+  } catch (error) {
+    console.error("Ask AI interpreter skipped:", error);
+  }
 
   const facts = await getAskAiFacts({
     userId: params.userId,
-    question: effectiveQuestion,
+    question: interpretation?.interpretedQuestion?.trim() || effectiveQuestion,
     timeZone: request.timezone,
+    interpretation,
   });
 
   let semanticMatches: AskAiRetrievedMatch[] = [];
@@ -226,9 +311,7 @@ export async function answerAskAiQuestion(params: {
       question: effectiveQuestion,
     });
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("Ask AI hybrid retrieval skipped:", error);
-    }
+    console.error("Ask AI hybrid retrieval skipped:", error);
   }
 
   return askWithOpenAI(
@@ -237,5 +320,7 @@ export async function answerAskAiQuestion(params: {
     request.conversation,
     request.question,
     request.replyLanguage,
+    runtimeContext,
+    interpretation,
   );
 }

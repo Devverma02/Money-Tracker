@@ -7,6 +7,7 @@ export const saveEntryRequestSchema = z
     actions: z.array(parsedActionSchema).min(1).max(20).optional(),
     parserConfidence: z.number().min(0).max(1),
     confirmSave: z.literal(true),
+    confirmBalanceOverride: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
     const itemCount =
@@ -65,8 +66,18 @@ export const saveEntryConflictResponseSchema = z.object({
   conflicts: z.array(personConflictSchema).min(1),
 });
 
+export const saveEntryBalanceGuardResponseSchema = z.object({
+  saved: z.literal(false),
+  errorCode: z.literal("insufficient_tracked_balance"),
+  message: z.string(),
+  currentBalance: z.number(),
+  projectedBalance: z.number(),
+  deficit: z.number().nonnegative(),
+});
+
 export type SaveEntryRequest = z.infer<typeof saveEntryRequestSchema>;
 export type SaveEntryResponse = z.infer<typeof saveEntryResponseSchema>;
 export type SaveEntryConflictResponse = z.infer<typeof saveEntryConflictResponseSchema>;
+export type SaveEntryBalanceGuardResponse = z.infer<typeof saveEntryBalanceGuardResponseSchema>;
 export type PersonCandidate = z.infer<typeof personCandidateSchema>;
 export type PersonConflict = z.infer<typeof personConflictSchema>;

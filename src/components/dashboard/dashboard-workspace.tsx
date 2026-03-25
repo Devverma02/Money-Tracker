@@ -7,10 +7,12 @@ import { TextEntryWorkspace } from "@/components/entry/text-entry-workspace";
 import { HistoryWorkspace } from "@/components/history/history-workspace";
 import { PersonLedgerWorkspace } from "@/components/persons/person-ledger-workspace";
 import { ReminderWorkspace } from "@/components/reminders/reminder-workspace";
+import { FinancialSetupCard } from "@/components/setup/financial-setup-card";
 import { SettingsWorkspace } from "@/components/settings/settings-workspace";
 import { OverviewCharts } from "@/components/summary/overview-charts";
 import { useReminderAlerts } from "@/hooks/use-reminder-alerts";
 import type { SettingsResponse } from "@/lib/settings/settings-contract";
+import type { SetupResponse } from "@/lib/setup/setup-contract";
 import { DashboardSummaryPanel } from "@/components/summary/dashboard-summary-panel";
 import { formatDateInputForTimeZone } from "@/lib/dates/timezone-datetime";
 import type { HistoryPageData } from "@/lib/ledger/history-types";
@@ -20,6 +22,7 @@ import type { DashboardSummary, RecurringSuggestion } from "@/lib/summaries/type
 type DashboardWorkspaceProps = {
   timezone: string;
   settings: SettingsResponse;
+  setupState: SetupResponse;
   summary: DashboardSummary;
   reminders: ReminderBoard;
   historyPageData: HistoryPageData;
@@ -96,10 +99,10 @@ const dashboardSections: DashboardSection[] = [
   },
   {
     id: "persons",
-    label: "Udhaar Book",
+    label: "People Ledger",
     shortLabel: "UB",
-    title: "Udhaar Book",
-    description: "Track person-wise balances — who owes what, all in one place.",
+    title: "People Ledger",
+    description: "Track person-wise balances and loan history in one place.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
         <path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" strokeLinecap="round" strokeLinejoin="round" />
@@ -188,6 +191,7 @@ function OverviewSection({
   onCreateRecurringReminder,
   displayName,
   currency,
+  setupState,
 }: {
   timezone: string;
   summary: DashboardSummary;
@@ -198,9 +202,19 @@ function OverviewSection({
   onCreateRecurringReminder: (suggestion: RecurringSuggestion) => void;
   displayName: string;
   currency: SettingsResponse["preferredCurrency"];
+  setupState: SetupResponse;
 }) {
   return (
     <div className="space-y-4">
+      {!setupState.hasCompletedSetup ? (
+        <FinancialSetupCard
+          setupState={setupState}
+          currency={currency}
+          title="Set your current money position"
+          description="Save your current balance and open loan positions once, so the app starts from your real situation today."
+        />
+      ) : null}
+
       <DashboardSummaryPanel
         summary={summary}
         activeReminderCount={reminders.counts.active}
@@ -330,6 +344,7 @@ function OverviewSection({
 export function DashboardWorkspace({
   timezone,
   settings,
+  setupState,
   summary,
   reminders,
   historyPageData,
@@ -407,7 +422,7 @@ export function DashboardWorkspace({
               <span className="block text-sm font-semibold text-gray-900">{activeSectionMeta.label}</span>
             </div>
           </div>
-          <span className="text-sm font-medium text-[#0d9488]">Switch ↓</span>
+          <span className="text-sm font-medium text-[#0d9488]">Switch section</span>
         </button>
       </div>
 
@@ -513,16 +528,21 @@ export function DashboardWorkspace({
             onCreateRecurringReminder={handleCreateRecurringReminder}
             displayName={settings.displayName}
             currency={settings.preferredCurrency}
+            setupState={setupState}
           />
         ) : null}
 
         {activeSection === "entry" ? (
           <TextEntryWorkspace
             timezone={timezone}
-            defaultBucket="personal"
+            defaultBucket={settings.defaultBucketSlug}
+            availableBuckets={settings.buckets.map((bucket) => bucket.slug)}
+            currency={settings.preferredCurrency}
             preferredLanguage={settings.preferredLanguage}
             voiceRepliesEnabled={settings.voiceRepliesEnabled}
             initialInputMode={settings.preferredEntryInput}
+            trackedBalance={summary.trackedBalance.currentBalance}
+            balanceGuardEnabled={settings.balanceGuardEnabled}
             recurringSuggestions={recurringSuggestions}
             initialDraftSeed={entryDraftSeed}
             onDraftSeedConsumed={() => setEntryDraftSeed(null)}
@@ -533,7 +553,7 @@ export function DashboardWorkspace({
           <ReminderWorkspace
             board={reminders}
             timezone={timezone}
-            defaultBucket="personal"
+            defaultBucket={settings.defaultBucketSlug}
             preferredLanguage={settings.preferredLanguage}
             voiceRepliesEnabled={settings.voiceRepliesEnabled}
             defaultReminderTime={settings.reminderDefaultTime}
@@ -550,6 +570,7 @@ export function DashboardWorkspace({
         {activeSection === "history" ? (
           <HistoryWorkspace
             historyPageData={historyPageData}
+            currency={settings.preferredCurrency}
             basePath="/dashboard"
             sectionId="history"
           />
@@ -568,7 +589,7 @@ export function DashboardWorkspace({
         ) : null}
 
         {activeSection === "settings" ? (
-          <SettingsWorkspace settings={settings} />
+          <SettingsWorkspace settings={settings} setupState={setupState} />
         ) : null}
       </div>
     </section>

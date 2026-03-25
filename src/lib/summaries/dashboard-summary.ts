@@ -1,5 +1,9 @@
 import { EntryType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getTrackedBalanceBreakdown } from "@/lib/ledger/tracked-balance";
+import { formatMoney } from "@/lib/settings/currency";
+import type { CurrencyCodeValue } from "@/lib/settings/settings-contract";
+import { getOpeningLoanPositions } from "@/lib/setup/setup";
 import { getDashboardDateRanges } from "@/lib/summaries/date-range";
 import type {
   DashboardSummary,
@@ -65,6 +69,11 @@ function computePendingLoans(
     amount: { toNumber: () => number };
     entryType: EntryType;
   }>,
+  openingPositions: Array<{
+    personName: string;
+    amount: { toNumber: () => number };
+    direction: "RECEIVABLE" | "PAYABLE";
+  }> = [],
 ) {
   const people = new Map<string, PendingLoanSummary>();
 
@@ -95,6 +104,24 @@ function computePendingLoans(
 
     if (entry.entryType === EntryType.LOAN_REPAID) {
       current.payable -= amount;
+    }
+
+    people.set(personName, current);
+  }
+
+  for (const item of openingPositions) {
+    const personName = item.personName.trim();
+    const current = people.get(personName) ?? {
+      personName,
+      receivable: 0,
+      payable: 0,
+    };
+    const amount = toNumber(item.amount);
+
+    if (item.direction === "RECEIVABLE") {
+      current.receivable += amount;
+    } else {
+      current.payable += amount;
     }
 
     people.set(personName, current);
@@ -138,7 +165,7 @@ function computeTopSpendingCategory(
   return winner;
 }
 
-function buildInsightText(summary: DashboardSummary) {
+function buildInsightText(summary: DashboardSummary, currency: CurrencyCodeValue) {
   if (
     summary.today.entryCount === 0 &&
     summary.week.entryCount === 0 &&
@@ -151,27 +178,28 @@ function buildInsightText(summary: DashboardSummary) {
     const topLoan = summary.pendingLoans[0];
 
     if (topLoan.receivable > 0) {
-      return `You still need to receive Rs ${topLoan.receivable} from ${topLoan.personName}. Keep that pending loan visible.`;
+      return `You still need to receive ${formatMoney(topLoan.receivable, currency)} from ${topLoan.personName}. Keep that pending loan visible.`;
     }
 
-    return `You still need to pay Rs ${topLoan.payable} to ${topLoan.personName}. Keep it in view while planning upcoming cash outflows.`;
+    return `You still need to pay ${formatMoney(topLoan.payable, currency)} to ${topLoan.personName}. Keep it in view while planning upcoming cash outflows.`;
   }
 
   if (summary.topSpendingCategory) {
-    return `Your highest spending this month is in ${summary.topSpendingCategory.category}, with a total of Rs ${summary.topSpendingCategory.amount}.`;
+    return `Your highest spending this month is in ${summary.topSpendingCategory.category}, with a total of ${formatMoney(summary.topSpendingCategory.amount, currency)}.`;
   }
 
-  return `This month your net cash movement is Rs ${summary.month.netCashMovement}. This is not a wallet balance, only the net effect of saved entries.`;
+  return `This month your net cash movement is ${formatMoney(summary.month.netCashMovement, currency)}. This is not a wallet balance, only the net effect of saved entries.`;
 }
 
 export async function getDashboardSummary(
   userId: string,
   timeZone: string,
+  currency: CurrencyCodeValue = "INR",
 ): Promise<DashboardSummary> {
   const ranges = getDashboardDateRanges(timeZone);
   const earliestStart = ranges.month.start;
 
-  const [todayEntries, weekEntries, monthEntries, loanEntries] = await Promise.all([
+  const [todayEntries, weekEntries, monthEntries, loanEntries, openingLoans, trackedBalance] = await Promise.all([
     prisma.ledgerEntry.findMany({
       where: {
         userId,
@@ -230,6 +258,8 @@ export async function getDashboardSummary(
         entryType: true,
       },
     }),
+    getOpeningLoanPositions(userId),
+    getTrackedBalanceBreakdown(userId, timeZone),
   ]);
 
   const today = buildPeriodSummary(
@@ -250,10 +280,16 @@ export async function getDashboardSummary(
     ranges.month.endExclusive,
     monthEntries,
   );
-  const pendingLoans = computePendingLoans(loanEntries);
+  const pendingLoans = computePendingLoans(loanEntries, openingLoans);
   const topSpendingCategory = computeTopSpendingCategory(monthEntries);
 
   const summary: DashboardSummary = {
+    trackedBalance: {
+      openingBalance: trackedBalance.openingBalance,
+      currentBalance: trackedBalance.currentBalance,
+      cashInSinceSetup: trackedBalance.cashInSinceSetup,
+      cashOutSinceSetup: trackedBalance.cashOutSinceSetup,
+    },
     today,
     week,
     month,
@@ -273,6 +309,6 @@ export async function getDashboardSummary(
 
   return {
     ...summary,
-    insightText: buildInsightText(summary),
+    insightText: buildInsightText(summary, currency),
   };
 }

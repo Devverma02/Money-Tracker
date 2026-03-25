@@ -18,6 +18,8 @@ export const parseRequestSchema = z.object({
   locale: z.string().default("hi-IN"),
   timezone: z.string().default("Asia/Kolkata"),
   allowedBuckets: z.array(z.string()).default(["personal"]),
+  knownPeople: z.array(z.string().trim().min(1).max(120)).max(120).default([]),
+  knownCategories: z.array(z.string().trim().min(1).max(120)).max(120).default([]),
 });
 
 export const parsedActionSchema = z.object({

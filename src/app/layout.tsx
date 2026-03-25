@@ -13,8 +13,8 @@ const display = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "MoneyManage",
-  description: "Premium trust-first personal finance workspace",
+  title: "JebKitab",
+  description: "Trust-first personal finance workspace for daily money tracking",
 };
 
 export default function RootLayout({

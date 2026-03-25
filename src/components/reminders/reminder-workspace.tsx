@@ -843,10 +843,10 @@ export function ReminderWorkspace({
                       </div>
                       <h3 className="mt-2 text-sm font-semibold text-gray-900">{item.title}</h3>
                       <p className="mt-0.5 text-xs text-gray-400">
-                        {item.linkedPerson ? `${item.linkedPerson} · ` : ""}
+                        {item.linkedPerson ? `${item.linkedPerson} | ` : ""}
                         {item.bucketSlug ?? "personal"}
                         {item.snoozeUntil
-                          ? ` · snoozed from ${formatReminderDate(item.dueAt, timezone)}`
+                          ? ` | snoozed from ${formatReminderDate(item.dueAt, timezone)}`
                           : ""}
                       </p>
                     </div>
@@ -877,7 +877,7 @@ export function ReminderWorkspace({
                         disabled={isPending}
                         className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
                       >
-                        ✓ Done
+                        Done
                       </button>
                       <button
                         type="button"

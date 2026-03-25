@@ -49,6 +49,27 @@ export function DashboardSummaryPanel({
         ) : null}
       </div>
 
+      <article className="rounded-xl border border-teal-100 bg-teal-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-[#0d9488]">
+              Tracked balance
+            </p>
+            <p className="mt-2 font-mono text-3xl font-bold text-gray-900">
+              {formatMoney(summary.trackedBalance.currentBalance, currency)}
+            </p>
+            <p className="mt-1.5 text-sm text-gray-600">
+              Opening {formatMoney(summary.trackedBalance.openingBalance, currency)} + in{" "}
+              {formatMoney(summary.trackedBalance.cashInSinceSetup, currency)} - out{" "}
+              {formatMoney(summary.trackedBalance.cashOutSinceSetup, currency)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-teal-200 bg-white px-3 py-2 text-xs text-gray-500">
+            Balance guard uses this tracked amount before expense save.
+          </div>
+        </div>
+      </article>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
           <article key={card.label} className="rounded-xl border border-gray-200 bg-white p-4">
@@ -67,14 +88,14 @@ export function DashboardSummaryPanel({
 
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <article className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
-            <p className="text-xs font-medium text-emerald-500">Kitna aaya</p>
+            <p className="text-xs font-medium text-emerald-500">Cash in</p>
             <p className="mt-2 font-mono text-2xl font-bold text-emerald-700">
               {formatMoney(summary.monthlyReport.cashInTotal, currency)}
             </p>
           </article>
 
           <article className="rounded-lg border border-red-100 bg-red-50 p-4">
-            <p className="text-xs font-medium text-red-500">Kitna gaya</p>
+            <p className="text-xs font-medium text-red-500">Cash out</p>
             <p className="mt-2 font-mono text-2xl font-bold text-red-700">
               {formatMoney(summary.monthlyReport.cashOutTotal, currency)}
             </p>
@@ -93,7 +114,7 @@ export function DashboardSummaryPanel({
           </article>
 
           <article className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <p className="text-xs font-medium text-gray-400">Lena / dena baki</p>
+            <p className="text-xs font-medium text-gray-400">Pending people balances</p>
             <div className="mt-2 space-y-1.5 text-sm text-gray-600">
               <p>
                 Receive:{" "}

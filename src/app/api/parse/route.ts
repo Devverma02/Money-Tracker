@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadAiCandidateContext } from "@/lib/ai/candidate-context";
 import { parseMoneyInput } from "@/lib/ai/parse-money-input";
 import { parseRequestSchema } from "@/lib/ai/parse-contract";
 import { createClient } from "@/lib/supabase/server";
@@ -15,7 +16,12 @@ export async function POST(request: Request) {
 
   try {
     const json = (await request.json()) as unknown;
-    const payload = parseRequestSchema.parse(json);
+    const candidateContext = await loadAiCandidateContext(user.id);
+    const payload = parseRequestSchema.parse({
+      ...((json as Record<string, unknown>) ?? {}),
+      knownPeople: candidateContext.knownPeople,
+      knownCategories: candidateContext.knownCategories,
+    });
     const result = await parseMoneyInput(payload);
 
     return NextResponse.json(result);

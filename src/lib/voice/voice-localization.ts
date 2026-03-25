@@ -1,3 +1,5 @@
+import { containsAnyNormalizedTerm } from "@/lib/text/unicode-search";
+
 export type VoiceReplyMode = "english" | "hinglish" | "hindi";
 
 export type VoiceReplyContext = {
@@ -5,8 +7,38 @@ export type VoiceReplyContext = {
   speechLang: "en-IN" | "hi-IN";
 };
 
-const hinglishSignalPattern =
-  /\b(aaj|kal|parso|udhaar|loan|kharcha|paise|paisa|rupaye|rupees|diya|liya|mila|milenge|aayega|aayenge|bachat|salary|ghar|dukaan|kheti|bhai|se|ko)\b/i;
+const hinglishSignalTerms = [
+  "aaj",
+  "kal",
+  "parso",
+  "udhaar",
+  "loan",
+  "kharcha",
+  "paise",
+  "paisa",
+  "rupaye",
+  "rupees",
+  "diya",
+  "liya",
+  "mila",
+  "milenge",
+  "aayega",
+  "aayenge",
+  "bachat",
+  "salary",
+  "ghar",
+  "dukaan",
+  "kheti",
+  "bhai",
+  "se",
+  "ko",
+  "आज",
+  "कल",
+  "परसों",
+  "उधार",
+  "पैसे",
+  "रुपये",
+];
 
 export function getVoiceReplyContext(text: string): VoiceReplyContext {
   if (/[\u0900-\u097f]/.test(text)) {
@@ -16,7 +48,7 @@ export function getVoiceReplyContext(text: string): VoiceReplyContext {
     };
   }
 
-  if (hinglishSignalPattern.test(text)) {
+  if (containsAnyNormalizedTerm(text, hinglishSignalTerms)) {
     return {
       mode: "hinglish",
       speechLang: "en-IN",

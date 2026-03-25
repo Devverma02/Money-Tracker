@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { askAiFocusSchema } from "@/lib/ai/ask-interpret-contract";
 
 export const askAiReplyLanguageSchema = z.enum(["english", "hinglish", "hindi"]);
 
@@ -23,6 +24,13 @@ export const askAiResponseSchema = z.object({
   retrievalMatchCount: z.number().int().min(0).max(20),
   resolvedPeriod: z.enum(["today", "week", "month", "year", "overall", "custom"]),
   resolvedPeriodLabel: z.string().min(1),
+  interpretation: z.object({
+    personFilter: z.string().nullable(),
+    categoryFilter: z.string().nullable(),
+    periodQuery: z.string().nullable(),
+    focus: askAiFocusSchema,
+    confidence: z.number().min(0).max(1),
+  }).nullable(),
 });
 
 export type AskAiRequest = z.infer<typeof askAiRequestSchema>;

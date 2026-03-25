@@ -62,6 +62,11 @@ enum ReminderStatus {
   CANCELLED
 }
 
+enum OpeningLoanDirection {
+  RECEIVABLE
+  PAYABLE
+}
+
 model AppProfile {
   id                String              @id @db.Uuid
   email             String?             @unique
@@ -72,11 +77,16 @@ model AppProfile {
   voiceRepliesEnabled Boolean           @default(true)
   reminderDefaultTime String            @default("09:00")
   preferredEntryInput EntryInputPreference @default(TYPING)
+  hasCompletedSetup  Boolean            @default(false)
+  balanceGuardEnabled Boolean           @default(true)
+  openingBalance     Decimal            @default(0) @db.Decimal(12, 2)
+  setupCompletedAt   DateTime?
   defaultBucketId   String?             @db.Uuid
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   defaultBucket     Bucket?             @relation("DefaultBucket", fields: [defaultBucketId], references: [id], onDelete: SetNull)
   buckets           Bucket[]            @relation("ProfileBuckets")
+  openingLoanPositions OpeningLoanPosition[]
   ledgerEntries     LedgerEntry[]
   reminders         Reminder[]
   corrections       EntryCorrection[]   @relation("CorrectionActor")
@@ -165,6 +175,21 @@ model Reminder {
   pushDeliveries ReminderPushDelivery[]
 
   @@index([userId, status, dueAt])
+}
+
+model OpeningLoanPosition {
+  id                   String               @id @default(uuid()) @db.Uuid
+  userId               String               @db.Uuid
+  personName           String
+  normalizedPersonName String
+  direction            OpeningLoanDirection
+  amount               Decimal              @db.Decimal(12, 2)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  user                 AppProfile           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, normalizedPersonName])
+  @@index([userId, direction])
 }
 
 model PushSubscription {

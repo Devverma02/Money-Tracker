@@ -13,13 +13,13 @@ export function AppFooter() {
           <div>
             <div className="flex items-center gap-2.5">
               <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#0d9488] text-[10px] font-bold text-white">
-                MM
+                JK
               </span>
-              <span className="text-sm font-semibold text-gray-900">MoneyManage</span>
+              <span className="text-sm font-semibold text-gray-900">JebKitab</span>
             </div>
             <p className="mt-3 max-w-sm text-sm leading-6 text-gray-500">
-              Review-first personal finance. Fast entry by text or voice,
-              grounded AI answers, and simple daily tracking.
+              Review-first personal finance with fast entry, grounded AI answers,
+              reminders, and simple daily tracking.
             </p>
           </div>
 
@@ -37,7 +37,7 @@ export function AppFooter() {
         </div>
 
         <div className="mt-8 flex flex-col gap-2 border-t border-gray-100 pt-5 text-xs text-gray-400 sm:flex-row sm:items-center sm:justify-between">
-          <span>© 2025 MoneyManage</span>
+          <span>© 2026 JebKitab</span>
           <span>Built for trust, speed, and clarity</span>
         </div>
       </div>

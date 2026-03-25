@@ -15,6 +15,12 @@ export type PendingLoanSummary = {
 };
 
 export type DashboardSummary = {
+  trackedBalance: {
+    openingBalance: number;
+    currentBalance: number;
+    cashInSinceSetup: number;
+    cashOutSinceSetup: number;
+  };
   today: PeriodSummary;
   week: PeriodSummary;
   month: PeriodSummary;

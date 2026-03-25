@@ -5,12 +5,15 @@ import { ParsePreviewCard } from "@/components/entry/parse-preview-card";
 import { useNativeSpeech } from "@/hooks/use-native-speech";
 import type { ParseResult, ParsedAction } from "@/lib/ai/parse-contract";
 import type {
+  SaveEntryBalanceGuardResponse,
   PersonConflict,
   SaveEntryConflictResponse,
   SaveEntryResponse,
 } from "@/lib/ledger/save-contract";
+import { formatMoney } from "@/lib/settings/currency";
 import {
   getSpeechLocaleForLanguage,
+  type CurrencyCodeValue,
   type EntryInputPreferenceValue,
   type PreferredLanguageValue,
 } from "@/lib/settings/settings-contract";
@@ -20,9 +23,13 @@ import { getVoiceReplyContext, voiceText, type VoiceReplyContext } from "@/lib/v
 type TextEntryWorkspaceProps = {
   timezone: string;
   defaultBucket: string;
+  availableBuckets: string[];
+  currency: CurrencyCodeValue;
   preferredLanguage: PreferredLanguageValue;
   voiceRepliesEnabled: boolean;
   initialInputMode: EntryInputPreferenceValue;
+  trackedBalance: number;
+  balanceGuardEnabled: boolean;
   recurringSuggestions?: RecurringSuggestion[];
   initialDraftSeed?: string | null;
   onDraftSeedConsumed?: () => void;
@@ -85,9 +92,13 @@ function buildResultSummary(actions: ParsedAction[]) {
 export function TextEntryWorkspace({
   timezone,
   defaultBucket,
+  availableBuckets,
+  currency,
   preferredLanguage,
   voiceRepliesEnabled,
   initialInputMode,
+  trackedBalance,
+  balanceGuardEnabled,
   recurringSuggestions = [],
   initialDraftSeed = null,
   onDraftSeedConsumed,
@@ -98,6 +109,8 @@ export function TextEntryWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
+  const [balanceGuardWarning, setBalanceGuardWarning] =
+    useState<SaveEntryBalanceGuardResponse | null>(null);
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
   const [personConflicts, setPersonConflicts] = useState<Record<number, PersonConflict>>({});
   const [voiceReplyContext, setVoiceReplyContext] = useState<VoiceReplyContext>({
@@ -118,6 +131,7 @@ export function TextEntryWorkspace({
 
   useEffect(() => {
     setSelectedIndexes(getReadyActionIndexes(result));
+    setBalanceGuardWarning(null);
   }, [result]);
 
   useEffect(() => {
@@ -269,37 +283,11 @@ export function TextEntryWorkspace({
     clarificationQuestion: string | null,
     context: VoiceReplyContext,
   ) => {
-    const normalized = clarificationQuestion?.toLowerCase() ?? "";
-
     if (!clarificationQuestion) {
       return voiceText(context, {
         english: "I need one more detail before I can prepare the entry.",
         hinglish: "Entry taiyar karne ke liye mujhe ek aur detail chahiye.",
         hindi: "Entry taiyar karne ke liye mujhe ek aur detail chahiye.",
-      });
-    }
-
-    if (/what is the amount/.test(normalized)) {
-      return voiceText(context, {
-        english: clarificationQuestion,
-        hinglish: "Amount clear nahi hua. Kitne rupaye the, dobara boliye.",
-        hindi: "Amount clear nahi hua. Kitne rupaye the, dobara boliye.",
-      });
-    }
-
-    if (/expense, income, or loan-related/.test(normalized)) {
-      return voiceText(context, {
-        english: clarificationQuestion,
-        hinglish: "Ye expense hai, income hai, ya loan wali entry hai? Bas itna bol dijiye.",
-        hindi: "Ye expense hai, income hai, ya loan wali entry hai? Bas itna bol dijiye.",
-      });
-    }
-
-    if (/which date should i use/.test(normalized)) {
-      return voiceText(context, {
-        english: clarificationQuestion,
-        hinglish: "Date clear nahi hui. Kaunsi date thi, fir se bol dijiye.",
-        hindi: "Date clear nahi hui. Kaunsi date thi, fir se bol dijiye.",
       });
     }
 
@@ -339,6 +327,7 @@ export function TextEntryWorkspace({
       setError(null);
       setSaveMessage(null);
       setDuplicateMessage(null);
+      setBalanceGuardWarning(null);
       setVoiceMessage(null);
       setPersonConflicts({});
       setLastInputMode(source);
@@ -352,7 +341,7 @@ export function TextEntryWorkspace({
           body: JSON.stringify({
             inputText: nextInputText,
             timezone,
-            allowedBuckets: [defaultBucket],
+            allowedBuckets: availableBuckets.length > 0 ? availableBuckets : [defaultBucket],
           }),
         });
 
@@ -432,6 +421,7 @@ export function TextEntryWorkspace({
   };
 
   const handleToggleSelect = (index: number) => {
+    setBalanceGuardWarning(null);
     setSelectedIndexes((current) =>
       current.includes(index)
         ? current.filter((item) => item !== index)
@@ -443,6 +433,7 @@ export function TextEntryWorkspace({
     if (!result) {
       return;
     }
+    setBalanceGuardWarning(null);
 
     const updatedActions = result.actions.map((existing, idx) =>
       idx === actionIndex ? updated : existing,
@@ -479,6 +470,7 @@ export function TextEntryWorkspace({
     if (!result) {
       return;
     }
+    setBalanceGuardWarning(null);
 
     const updatedActions = result.actions.map((existing, idx) => {
       if (idx !== actionIndex) {
@@ -513,10 +505,13 @@ export function TextEntryWorkspace({
       return;
     }
 
+    const confirmBalanceOverride = balanceGuardWarning !== null;
+
     startSaveTransition(async () => {
       setError(null);
       setSaveMessage(null);
       setDuplicateMessage(null);
+      setBalanceGuardWarning(null);
       setPersonConflicts({});
 
       try {
@@ -529,15 +524,22 @@ export function TextEntryWorkspace({
             actions: selectedActions,
             parserConfidence: result.confidence,
             confirmSave: true,
+            confirmBalanceOverride,
           }),
         });
 
         const payload = (await response.json()) as
           | SaveEntryResponse
           | SaveEntryConflictResponse
+          | SaveEntryBalanceGuardResponse
           | { error?: string };
 
         if (response.status === 409) {
+          if ("errorCode" in payload && payload.errorCode === "insufficient_tracked_balance") {
+            setBalanceGuardWarning(payload);
+            return;
+          }
+
           if (!("conflicts" in payload) || !Array.isArray(payload.conflicts)) {
             throw new Error("The save response was invalid.");
           }
@@ -590,6 +592,7 @@ export function TextEntryWorkspace({
         }
         setAwaitingVoiceClarification(false);
         setVoiceConversationText("");
+        setBalanceGuardWarning(null);
 
         const remainingActions = result.actions.filter(
           (_, index) => !selectedReadyIndexes.includes(index),
@@ -724,6 +727,18 @@ export function TextEntryWorkspace({
             ) : null}
           </div>
         ) : null}
+
+        {balanceGuardEnabled ? (
+          <div className="mt-3 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-sm text-gray-700">
+            <p className="font-medium text-[#0d9488]">
+              Tracked balance: {formatMoney(trackedBalance, currency)}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              The balance guard checks this amount before saving an expense.
+            </p>
+          </div>
+        ) : null}
+
         {/* Action buttons */}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           {entryInputMode === "typing" ? (
@@ -742,7 +757,11 @@ export function TextEntryWorkspace({
             disabled={!canSave}
             className="secondary-button rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSaving ? "Saving..." : saveButtonLabel}
+            {isSaving
+              ? "Saving..."
+              : balanceGuardWarning
+                ? "Save anyway"
+                : saveButtonLabel}
           </button>
         </div>
 
@@ -756,6 +775,19 @@ export function TextEntryWorkspace({
 
         {duplicateMessage ? (
           <p className="status-warn mt-3 rounded-lg border px-3 py-2 text-sm">{duplicateMessage}</p>
+        ) : null}
+
+        {balanceGuardWarning ? (
+          <div className="status-warn mt-3 rounded-lg border px-3 py-3 text-sm">
+            <p className="font-medium">Tracked balance warning</p>
+            <p className="mt-1">
+              Your current tracked balance is {formatMoney(balanceGuardWarning.currentBalance, currency)},
+              and after this save it would become {formatMoney(balanceGuardWarning.projectedBalance, currency)}.
+            </p>
+            <p className="mt-1 text-xs">
+              If you still want to continue because you have money outside this tracked balance, click save again.
+            </p>
+          </div>
         ) : null}
       </div>
 
@@ -850,6 +882,7 @@ export function TextEntryWorkspace({
               key={`${action.sourceText}-${index}`}
               action={action}
               index={index}
+              currency={currency}
               isReadyToSave={ready}
               canSelect={ready}
               isSelected={selectedIndexes.includes(index)}

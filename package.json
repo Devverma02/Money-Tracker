@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
-    "eval:parser": "node ./node_modules/tsx/dist/cli.mjs scripts/parser-evals.ts",
+    "eval:parser": "node --env-file=.env ./node_modules/tsx/dist/cli.mjs scripts/parser-evals.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push"
   },

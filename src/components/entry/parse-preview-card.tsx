@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import type { ParsedAction } from "@/lib/ai/parse-contract";
 import { allowedEntryTypes } from "@/lib/ai/parse-contract";
 import type { PersonConflict } from "@/lib/ledger/save-contract";
+import { formatMoney } from "@/lib/settings/currency";
+import type { CurrencyCodeValue } from "@/lib/settings/settings-contract";
 
 const entryTypeLabels: Record<string, string> = {
   expense: "Expense",
@@ -27,6 +29,40 @@ const entryTypeColors: Record<string, string> = {
   note: "border-gray-200 bg-gray-50 text-gray-600",
 };
 
+function getMissingInfo(action: ParsedAction) {
+  const missing: Array<{
+    key: string;
+    label: string;
+    help: string;
+  }> = [];
+
+  if (action.amount === null && action.entryType !== "note") {
+    missing.push({
+      key: "amount",
+      label: "Amount missing",
+      help: "Add the amount so this entry can be saved.",
+    });
+  }
+
+  if (!action.entryType) {
+    missing.push({
+      key: "type",
+      label: "Type missing",
+      help: "Choose whether this is an expense, income, or loan entry.",
+    });
+  }
+
+  if (!action.resolvedDate) {
+    missing.push({
+      key: "date",
+      label: "Date missing",
+      help: "Add the date, for example today, yesterday, or 25 March.",
+    });
+  }
+
+  return missing;
+}
+
 type PersonResolution =
   | {
       mode: "existing";
@@ -40,6 +76,7 @@ type PersonResolution =
 type ParsePreviewCardProps = {
   action: ParsedAction;
   index: number;
+  currency: CurrencyCodeValue;
   isReadyToSave?: boolean;
   isSelected?: boolean;
   canSelect?: boolean;
@@ -52,6 +89,7 @@ type ParsePreviewCardProps = {
 export function ParsePreviewCard({
   action,
   index,
+  currency,
   isReadyToSave = false,
   isSelected = false,
   canSelect = false,
@@ -73,6 +111,7 @@ export function ParsePreviewCard({
   const typeKey = action.entryType ?? "note";
   const typeColor = entryTypeColors[typeKey] ?? entryTypeColors.note;
   const hasSelectedResolution = Boolean(action.resolvedPersonId || action.createPersonLabel);
+  const missingInfo = useMemo(() => getMissingInfo(action), [action]);
 
   const resolvedLabel = useMemo(() => {
     if (!personConflict) {
@@ -270,7 +309,7 @@ export function ParsePreviewCard({
 
         <div className="flex items-center gap-2">
           <p className="font-mono text-xl font-bold text-gray-900">
-            {action.amount ? `Rs ${action.amount.toLocaleString("en-IN")}` : "--"}
+            {action.amount !== null ? formatMoney(action.amount, currency) : "--"}
           </p>
           <span
             className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold ${
@@ -328,6 +367,29 @@ export function ParsePreviewCard({
       <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-500">
         <span className="font-medium text-gray-700">Source:</span> {action.sourceText}
       </div>
+
+      {!isReadyToSave && missingInfo.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-semibold text-amber-900">Still needed to save</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {missingInfo.map((item) => (
+              <span
+                key={item.key}
+                className="rounded-md border border-amber-200 bg-white px-2 py-1 text-xs font-semibold text-amber-800"
+              >
+                {item.label}
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 space-y-1">
+            {missingInfo.map((item) => (
+              <p key={`${item.key}-help`} className="text-xs text-amber-900">
+                <span className="font-medium">{item.label}:</span> {item.help}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {personConflict ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">

@@ -1,5 +1,6 @@
 import { EntryType } from "@prisma/client";
 import { prisma as prismaClient } from "@/lib/prisma";
+import { getOpeningLoanPositions } from "@/lib/setup/setup";
 import {
   isShortLongNameVariant,
   normalizePersonLookup,
@@ -125,6 +126,18 @@ async function loadEntriesByName(userId: string) {
   return entries;
 }
 
+async function loadOpeningLoanPositions(userId: string) {
+  const positions = await getOpeningLoanPositions(userId);
+  return positions.map((item) => ({
+    id: item.id,
+    personName: item.personName,
+    normalizedPersonName: item.normalizedPersonName,
+    direction: item.direction,
+    amount: item.amount.toNumber(),
+    createdAt: item.createdAt,
+  }));
+}
+
 function mapEntriesToPeople(people: PersonRecord[], entries: Awaited<ReturnType<typeof loadEntriesByName>>) {
   const normalizedToPerson = new Map<string, PersonRecord>();
 
@@ -152,12 +165,47 @@ function mapEntriesToPeople(people: PersonRecord[], entries: Awaited<ReturnType<
   return grouped;
 }
 
+function mapOpeningPositionsToPeople(
+  people: PersonRecord[],
+  positions: Awaited<ReturnType<typeof loadOpeningLoanPositions>>,
+) {
+  const normalizedToPerson = new Map<string, PersonRecord>();
+
+  for (const person of people) {
+    for (const name of buildNameSet(person)) {
+      normalizedToPerson.set(name, person);
+    }
+  }
+
+  const grouped = new Map<string, typeof positions>();
+
+  for (const item of positions) {
+    const person = normalizedToPerson.get(item.normalizedPersonName);
+
+    if (!person) {
+      continue;
+    }
+
+    const current = grouped.get(person.id) ?? [];
+    current.push(item);
+    grouped.set(person.id, current);
+  }
+
+  return grouped;
+}
+
 export async function getPersonList(userId: string) {
-  const [people, entries] = await Promise.all([loadPeople(userId), loadEntriesByName(userId)]);
+  const [people, entries, openingPositions] = await Promise.all([
+    loadPeople(userId),
+    loadEntriesByName(userId),
+    loadOpeningLoanPositions(userId),
+  ]);
   const grouped = mapEntriesToPeople(people, entries);
+  const groupedOpening = mapOpeningPositionsToPeople(people, openingPositions);
 
   const summaries = people.map((person) => {
     const personEntries = grouped.get(person.id) ?? [];
+    const personOpening = groupedOpening.get(person.id) ?? [];
     let totalGiven = 0;
     let totalReceivedBack = 0;
     let totalTaken = 0;
@@ -177,7 +225,22 @@ export async function getPersonList(userId: string) {
       }
     }
 
-    const latestDate = personEntries[0]?.entryDate ?? null;
+    for (const item of personOpening) {
+      if (item.direction === "RECEIVABLE") {
+        totalGiven += item.amount;
+      } else {
+        totalTaken += item.amount;
+      }
+    }
+
+    const latestEntryDate = personEntries[0]?.entryDate ?? null;
+    const latestOpeningDate = personOpening[0]?.createdAt ?? null;
+    const latestDate =
+      latestEntryDate && latestOpeningDate
+        ? latestEntryDate > latestOpeningDate
+          ? latestEntryDate
+          : latestOpeningDate
+        : latestEntryDate ?? latestOpeningDate;
 
     return {
       personId: person.id,
@@ -191,7 +254,7 @@ export async function getPersonList(userId: string) {
       totalRepaid,
       netReceivable: Math.max(totalGiven - totalReceivedBack, 0),
       netPayable: Math.max(totalTaken - totalRepaid, 0),
-      transactionCount: personEntries.length,
+      transactionCount: personEntries.length + personOpening.length,
       lastTransactionDate: latestDate ? latestDate.toISOString() : new Date(0).toISOString(),
     } satisfies PersonSummary;
   });
@@ -248,7 +311,11 @@ export async function getPersonMergeSuggestions(userId: string) {
 }
 
 export async function getPersonDetail(userId: string, personId: string) {
-  const [people, entries] = await Promise.all([loadPeople(userId), loadEntriesByName(userId)]);
+  const [people, entries, openingPositions] = await Promise.all([
+    loadPeople(userId),
+    loadEntriesByName(userId),
+    loadOpeningLoanPositions(userId),
+  ]);
   const person = people.find((item) => item.id === personId);
 
   if (!person) {
@@ -256,7 +323,9 @@ export async function getPersonDetail(userId: string, personId: string) {
   }
 
   const grouped = mapEntriesToPeople(people, entries);
+  const groupedOpening = mapOpeningPositionsToPeople(people, openingPositions);
   const personEntries = grouped.get(person.id) ?? [];
+  const personOpening = groupedOpening.get(person.id) ?? [];
 
   let totalGiven = 0;
   let totalReceivedBack = 0;
@@ -291,6 +360,31 @@ export async function getPersonDetail(userId: string, personId: string) {
     };
   });
 
+  const openingTransactions: PersonTransaction[] = personOpening.map((item) => ({
+    id: `opening-${item.id}`,
+    amount: item.amount,
+    entryType: item.direction === "RECEIVABLE" ? "LOAN_GIVEN" : "LOAN_TAKEN",
+    category: "opening position",
+    note:
+      item.direction === "RECEIVABLE"
+        ? `Opening receivable with ${person.displayName}.`
+        : `Opening payable to ${person.displayName}.`,
+    entryDate: item.createdAt.toISOString(),
+    sourceText:
+      item.direction === "RECEIVABLE"
+        ? `Opening receivable for ${person.displayName}`
+        : `Opening payable for ${person.displayName}`,
+    createdAt: item.createdAt.toISOString(),
+  }));
+
+  for (const item of personOpening) {
+    if (item.direction === "RECEIVABLE") {
+      totalGiven += item.amount;
+    } else {
+      totalTaken += item.amount;
+    }
+  }
+
   return {
     personId: person.id,
     personName: person.displayName,
@@ -305,9 +399,11 @@ export async function getPersonDetail(userId: string, personId: string) {
       otherAmount,
       netReceivable: Math.max(totalGiven - totalReceivedBack, 0),
       netPayable: Math.max(totalTaken - totalRepaid, 0),
-      transactionCount: personEntries.length,
+      transactionCount: personEntries.length + personOpening.length,
     },
-    transactions,
+    transactions: [...openingTransactions, ...transactions].sort((left, right) =>
+      right.entryDate.localeCompare(left.entryDate),
+    ),
   } satisfies PersonDetail;
 }
 

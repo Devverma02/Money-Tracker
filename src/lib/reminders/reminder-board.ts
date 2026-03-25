@@ -209,8 +209,8 @@ export async function getReminderBoard(
 
   const board: ReminderBoard = {
     nextReminder: activeReminders[0] ?? null,
-    activeReminders: activeReminders.slice(0, 12),
-    closedReminders: closedReminders.slice(0, 8),
+    activeReminders,
+    closedReminders,
     counts: {
       active: activeCount,
       overdue: overdueCount,

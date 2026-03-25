@@ -12,7 +12,7 @@ type EntryNoteInput = {
 };
 
 function formatCurrency(amount: number) {
-  return `Rs ${amount.toLocaleString("en-IN")}`;
+  return amount.toLocaleString("en-IN");
 }
 
 function normalizeEntryTypeLabel(entryType: string) {

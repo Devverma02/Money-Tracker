@@ -6,6 +6,7 @@ import {
   type ParseResult,
 } from "@/lib/ai/parse-contract";
 import { extractStructuredText } from "@/lib/ai/openai-utils";
+import { buildAiRuntimeContext } from "@/lib/ai/runtime-context";
 import { serverEnv } from "@/lib/env/server";
 
 
@@ -21,6 +22,7 @@ function buildSystemPrompt(): string {
     "4. Understand Hindi, Hinglish, and English naturally — the user may mix all three.",
     "5. Default unresolved bucket to the first allowed bucket.",
     "6. If any critical money fact (amount, type) is genuinely unclear, set needsClarification=true and ask ONE short clarification question in Hinglish.",
+    "7. Use the provided knownPeople and knownCategories as strong candidate hints. If one clearly matches, prefer that exact string.",
     "",
     "ENTRY TYPES — classify accurately:",
     "- expense: any spending, purchase, bill payment, recharge. Keywords: kharcha, spent, bought, bhara, laga, paid, kharidi, shopping, bill.",
@@ -33,7 +35,7 @@ function buildSystemPrompt(): string {
     "- note: a non-monetary note/memo. Use ONLY when there is no amount and no money intent.",
     "",
     "DATE RESOLUTION:",
-    "- Use the provided 'today' date to resolve all relative dates.",
+    "- Use the provided runtime context with current local date/time to resolve all relative dates.",
     "- 'aaj/today' = today.",
     "- 'kal' with past tense (diya, liya, gaya, hua, tha, the) = yesterday.",
     "- 'kal' with future tense (dena hai, milega, aayega, denge) = tomorrow.",
@@ -97,18 +99,17 @@ function buildSystemPrompt(): string {
 }
 
 async function parseWithOpenAI(request: ParseRequest): Promise<ParseResult> {
+  const runtimeContext = buildAiRuntimeContext({
+    timezone: request.timezone,
+    locale: request.locale,
+  });
+
   const userPrompt = JSON.stringify({
     raw_text: request.inputText,
-    locale: request.locale,
-    timezone: request.timezone,
+    runtimeContext,
     allowed_buckets: request.allowedBuckets,
-    today: new Intl.DateTimeFormat("en-CA", {
-      timeZone: request.timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date()),
-    now_iso: new Date().toISOString(),
+    knownPeople: request.knownPeople,
+    knownCategories: request.knownCategories,
   });
 
   const response = await fetch("https://api.openai.com/v1/responses", {

@@ -54,10 +54,10 @@ export default async function DashboardLayout({
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0d9488] text-xs font-bold text-white">
-                MM
+                JK
               </div>
               <div>
-                <span className="block text-sm font-semibold text-gray-900">MoneyManage</span>
+                <span className="block text-sm font-semibold text-gray-900">JebKitab</span>
                 <span className="block text-xs text-gray-400">{userLabel}</span>
               </div>
             </div>

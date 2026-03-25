@@ -3,7 +3,10 @@ import { ensureAppProfile } from "@/lib/bootstrap-profile";
 import { getRecentEntries } from "@/lib/ledger/history";
 import { getRecurringSuggestions } from "@/lib/recurring/recurring-suggestions";
 import { getReminderBoard } from "@/lib/reminders/reminder-board";
+import { getUserSettings } from "@/lib/settings/settings";
 import { settingsResponseSchema } from "@/lib/settings/settings-contract";
+import { getSetupState } from "@/lib/setup/setup";
+import { setupResponseSchema } from "@/lib/setup/setup-contract";
 import { getDashboardSummary } from "@/lib/summaries/dashboard-summary";
 import { createClient } from "@/lib/supabase/server";
 
@@ -52,7 +55,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const params = (await searchParams) ?? {};
-  const profile = await ensureAppProfile(user);
+  await ensureAppProfile(user);
+  const settings = await getUserSettings(user.id);
   const activeSection =
     params.section && allowedSections.has(params.section as never)
       ? (params.section as
@@ -65,10 +69,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           | "settings")
       : "overview";
 
-  const [summary, reminders, historyPageData, recurringSuggestions] = await Promise.all([
-    getDashboardSummary(user.id, profile.timezone),
-    getReminderBoard(user.id, profile.timezone),
-    getRecentEntries(user.id, profile.timezone, {
+  const [summary, reminders, historyPageData, recurringSuggestions, setupState] = await Promise.all([
+    getDashboardSummary(
+      user.id,
+      settings.timezone,
+      settings.preferredCurrency ?? "INR",
+    ),
+    getReminderBoard(user.id, settings.timezone),
+    getRecentEntries(user.id, settings.timezone, {
       page: Number(params.page ?? "1"),
       entryType: params.type ?? "",
       period:
@@ -79,22 +87,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           : "all",
       search: params.search ?? "",
     }),
-    getRecurringSuggestions(user.id, profile.timezone),
+    getRecurringSuggestions(user.id, settings.timezone),
+    getSetupState(user.id),
   ]);
 
   return (
     <DashboardWorkspace
-      timezone={profile.timezone}
-      settings={settingsResponseSchema.parse({
-        displayName: profile.displayName ?? "",
-        email: profile.email ?? null,
-        preferredLanguage: profile.preferredLanguage ?? "HINGLISH",
-        timezone: profile.timezone ?? "Asia/Kolkata",
-        preferredCurrency: profile.preferredCurrency ?? "INR",
-        voiceRepliesEnabled: profile.voiceRepliesEnabled ?? true,
-        reminderDefaultTime: profile.reminderDefaultTime ?? "09:00",
-        preferredEntryInput: profile.preferredEntryInput ?? "TYPING",
-      })}
+      timezone={settings.timezone}
+      settings={settingsResponseSchema.parse(settings)}
+      setupState={setupResponseSchema.parse(setupState)}
       summary={summary}
       reminders={reminders}
       historyPageData={historyPageData}

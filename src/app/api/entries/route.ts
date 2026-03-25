@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { saveEntryResponseSchema, saveEntryRequestSchema } from "@/lib/ledger/save-contract";
-import { saveParsedEntries } from "@/lib/ledger/save-entry";
+import { saveParsedEntries, TrackedBalanceGuardError } from "@/lib/ledger/save-entry";
 import { PersonAmbiguityError } from "@/lib/persons/person-resolution";
 
 export async function POST(request: Request) {
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       user,
       actions,
       parserConfidence: payload.parserConfidence,
+      confirmBalanceOverride: payload.confirmBalanceOverride ?? false,
     });
 
     return NextResponse.json(saveEntryResponseSchema.parse(result));
@@ -59,6 +60,20 @@ export async function POST(request: Request) {
           errorCode: "person_ambiguity",
           message: error.message,
           conflicts: error.conflicts,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (error instanceof TrackedBalanceGuardError) {
+      return NextResponse.json(
+        {
+          saved: false,
+          errorCode: "insufficient_tracked_balance",
+          message: error.message,
+          currentBalance: error.details.currentBalance,
+          projectedBalance: error.details.projectedBalance,
+          deficit: error.details.deficit,
         },
         { status: 409 },
       );

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadAiCandidateContext } from "@/lib/ai/candidate-context";
 import { parseReminderInput } from "@/lib/reminders/parse-reminder-input";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,7 +15,12 @@ export async function POST(request: Request) {
 
   try {
     const json = (await request.json()) as unknown;
-    const result = await parseReminderInput(json);
+    const candidateContext = await loadAiCandidateContext(user.id);
+    const result = await parseReminderInput({
+      ...((json as Record<string, unknown>) ?? {}),
+      knownPeople: candidateContext.knownPeople,
+      knownCategories: candidateContext.knownCategories,
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof Error) {

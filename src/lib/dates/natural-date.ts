@@ -1,3 +1,8 @@
+import {
+  containsAnyNormalizedTerm,
+  normalizeSearchText,
+} from "@/lib/text/unicode-search";
+
 export type ResolvedAskPeriod =
   | "today"
   | "week"
@@ -144,7 +149,7 @@ function titleCase(value: string) {
 }
 
 export function resolveAskDateRange(question: string, timeZone: string): ResolvedAskDateRange {
-  const normalized = question.toLowerCase().replace(/\s+/g, " ").trim();
+  const normalized = normalizeSearchText(question);
   const now = new Date();
   const local = getLocalDateParts(now, timeZone);
   const todayStart = startOfLocalDay(local, timeZone);
@@ -158,7 +163,18 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
   const yearStart = startOfLocalYear(local.year, timeZone);
   const nextYearStart = startOfLocalYear(local.year + 1, timeZone);
 
-  if (/\b(all time|all-time|overall|lifetime|sab|poora data|complete history)\b/.test(normalized)) {
+  if (
+    containsAnyNormalizedTerm(normalized, [
+      "all time",
+      "all-time",
+      "overall",
+      "lifetime",
+      "sab",
+      "poora data",
+      "पूरा डेटा",
+      "complete history",
+    ])
+  ) {
     return {
       resolvedPeriod: "overall",
       label: "Overall",
@@ -209,7 +225,7 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
     };
   }
 
-  if (/\b(yesterday|kal)\b/.test(normalized)) {
+  if (containsAnyNormalizedTerm(normalized, ["yesterday", "kal", "कल"])) {
     const start = addDays(todayStart, -1);
 
     return {
@@ -220,7 +236,7 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
     };
   }
 
-  if (/\b(today|aaj)\b/.test(normalized)) {
+  if (containsAnyNormalizedTerm(normalized, ["today", "aaj", "आज"])) {
     return {
       resolvedPeriod: "today",
       label: "Today",
@@ -229,7 +245,16 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
     };
   }
 
-  if (/\b(last week|pichhle hafta|pichhle hafte|last hafte)\b/.test(normalized)) {
+  if (
+    containsAnyNormalizedTerm(normalized, [
+      "last week",
+      "pichhle hafta",
+      "pichhle hafte",
+      "last hafte",
+      "पिछले हफ्ते",
+      "पिछला हफ्ता",
+    ])
+  ) {
     const start = addDays(weekStart, -7);
 
     return {
@@ -240,7 +265,19 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
     };
   }
 
-  if (/\b(this week|week|hafte|hafta|weekly|is hafte)\b/.test(normalized)) {
+  if (
+    containsAnyNormalizedTerm(normalized, [
+      "this week",
+      "week",
+      "hafte",
+      "hafta",
+      "weekly",
+      "is hafte",
+      "इस हफ्ते",
+      "हफ्ता",
+      "हफ्ते",
+    ])
+  ) {
     return {
       resolvedPeriod: "week",
       label: "This week",
@@ -249,7 +286,15 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
     };
   }
 
-  if (/\b(last month|pichhla mahina|pichhle mahine)\b/.test(normalized)) {
+  if (
+    containsAnyNormalizedTerm(normalized, [
+      "last month",
+      "pichhla mahina",
+      "pichhle mahine",
+      "पिछला महीना",
+      "पिछले महीने",
+    ])
+  ) {
     const currentMonthStart = monthStart;
     const start = addMonths(currentMonthStart, -1);
 
@@ -261,7 +306,19 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
     };
   }
 
-  if (/\b(this month|month|mahina|mahine|monthly|is mahine)\b/.test(normalized)) {
+  if (
+    containsAnyNormalizedTerm(normalized, [
+      "this month",
+      "month",
+      "mahina",
+      "mahine",
+      "monthly",
+      "is mahine",
+      "इस महीने",
+      "महीना",
+      "महीने",
+    ])
+  ) {
     return {
       resolvedPeriod: "month",
       label: "This month",
@@ -270,7 +327,17 @@ export function resolveAskDateRange(question: string, timeZone: string): Resolve
     };
   }
 
-  if (/\b(this year|yearly|year|saal|is saal)\b/.test(normalized)) {
+  if (
+    containsAnyNormalizedTerm(normalized, [
+      "this year",
+      "yearly",
+      "year",
+      "saal",
+      "is saal",
+      "इस साल",
+      "साल",
+    ])
+  ) {
     return {
       resolvedPeriod: "year",
       label: "This year",

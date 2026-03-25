@@ -3,6 +3,71 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { EntryType } from "@prisma/client";
 
+function parseOffsetLabel(offsetLabel: string) {
+  const match = offsetLabel.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/i);
+
+  if (!match) {
+    return 0;
+  }
+
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3] ?? "0");
+  return sign * (hours * 60 + minutes);
+}
+
+function getTimeZoneOffsetMinutes(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "shortOffset",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const offsetLabel =
+    parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT+0";
+
+  return parseOffsetLabel(offsetLabel);
+}
+
+function zonedDateTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  timeZone: string,
+) {
+  const roughUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const offsetMinutes = getTimeZoneOffsetMinutes(roughUtc, timeZone);
+  return new Date(roughUtc.getTime() - offsetMinutes * 60_000);
+}
+
+function addDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function getLocalDateParts(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const getValue = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return {
+    year: Number(getValue("year")),
+    month: Number(getValue("month")),
+    day: Number(getValue("day")),
+  };
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient();
   const {
@@ -18,12 +83,47 @@ export async function GET(request: Request) {
     const timeZone = url.searchParams.get("tz") ?? "Asia/Kolkata";
 
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const localNow = getLocalDateParts(now, timeZone);
+    const currentMonthStart = zonedDateTimeToUtc(
+      localNow.year,
+      localNow.month,
+      1,
+      0,
+      0,
+      0,
+      timeZone,
+    );
+    const nextMonthStart =
+      localNow.month === 12
+        ? zonedDateTimeToUtc(localNow.year + 1, 1, 1, 0, 0, 0, timeZone)
+        : zonedDateTimeToUtc(localNow.year, localNow.month + 1, 1, 0, 0, 0, timeZone);
+    const oldestMonthAnchor = new Date(
+      Date.UTC(localNow.year, localNow.month - 1 - 3, 1),
+    );
+    const oldestMonthStart = zonedDateTimeToUtc(
+      oldestMonthAnchor.getUTCFullYear(),
+      oldestMonthAnchor.getUTCMonth() + 1,
+      1,
+      0,
+      0,
+      0,
+      timeZone,
+    );
+    const todayStart = zonedDateTimeToUtc(
+      localNow.year,
+      localNow.month,
+      localNow.day,
+      0,
+      0,
+      0,
+      timeZone,
+    );
+    const sevenDaysStart = addDays(todayStart, -6);
 
     const entries = await prisma.ledgerEntry.findMany({
       where: {
         userId: user.id,
-        entryDate: { gte: thirtyDaysAgo },
+        entryDate: { gte: oldestMonthStart },
       },
       select: {
         amount: true,
@@ -36,10 +136,8 @@ export async function GET(request: Request) {
 
     // Weekly daily spending (last 7 days)
     const dailyMap = new Map<string, { expense: number; income: number }>();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
     for (let d = 0; d < 7; d++) {
-      const day = new Date(sevenDaysAgo.getTime() + (d + 1) * 24 * 60 * 60 * 1000);
+      const day = addDays(sevenDaysStart, d);
       const key = day.toLocaleDateString("en-IN", {
         timeZone,
         weekday: "short",
@@ -55,7 +153,9 @@ export async function GET(request: Request) {
     const monthlyMap = new Map<string, { expense: number; income: number }>();
 
     for (let m = 3; m >= 0; m--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - m, 1);
+      const monthDate = new Date(
+        Date.UTC(localNow.year, localNow.month - 1 - m, 1),
+      );
       const monthLabel = monthDate.toLocaleDateString("en-IN", {
         timeZone,
         month: "short",
@@ -69,7 +169,7 @@ export async function GET(request: Request) {
       const entryDate = entry.entryDate;
 
       // Daily
-      if (entryDate >= sevenDaysAgo) {
+      if (entryDate >= sevenDaysStart) {
         const dayKey = entryDate.toLocaleDateString("en-IN", {
           timeZone,
           weekday: "short",
@@ -88,13 +188,10 @@ export async function GET(request: Request) {
       }
 
       // Category (this month expenses only)
-      const currentMonth = now.getMonth();
-      const entryMonth = entryDate.getMonth();
-
       if (
         entry.entryType === EntryType.EXPENSE &&
-        entryMonth === currentMonth &&
-        entryDate.getFullYear() === now.getFullYear()
+        entryDate >= currentMonthStart &&
+        entryDate < nextMonthStart
       ) {
         const category = entry.category ?? "Other";
         categoryMap.set(category, (categoryMap.get(category) ?? 0) + amount);

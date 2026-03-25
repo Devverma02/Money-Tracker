@@ -122,7 +122,7 @@ export async function GET(request: Request) {
         await sendWebPush({
           subscription,
           payload: {
-            title: "MoneyManage reminder",
+            title: "JebKitab reminder",
             body: reminder.linkedPerson
               ? `${reminder.title} • ${reminder.linkedPerson}`
               : reminder.title,

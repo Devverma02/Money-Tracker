@@ -154,7 +154,6 @@ async function loadSourceDocuments(userId: string) {
       orderBy: {
         updatedAt: "desc",
       },
-      take: 300,
     }),
     prisma.reminder.findMany({
       where: {
@@ -171,7 +170,6 @@ async function loadSourceDocuments(userId: string) {
       orderBy: {
         updatedAt: "desc",
       },
-      take: 120,
     }),
   ]);
 
@@ -226,7 +224,9 @@ async function upsertAskAiDocument(params: {
         source_id,
         content,
         metadata,
-        embedding
+        embedding,
+        created_at,
+        updated_at
       )
       values (
         ${params.userId}::uuid,
@@ -234,7 +234,9 @@ async function upsertAskAiDocument(params: {
         ${params.document.sourceId},
         ${params.document.content},
         ${JSON.stringify(params.document.metadata)}::jsonb,
-        ${embeddingLiteral}::vector
+        ${embeddingLiteral}::vector,
+        now(),
+        now()
       )
       on conflict (user_id, source_type, source_id)
       do update set

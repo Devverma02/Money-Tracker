@@ -47,6 +47,28 @@ function getRetrievalBadge(meta: AskAiResponse) {
   };
 }
 
+function getInterpretationSummary(meta: AskAiResponse) {
+  if (!meta.interpretation) {
+    return null;
+  }
+
+  const parts = [
+    `Focus: ${meta.interpretation.focus}`,
+    meta.interpretation.personFilter
+      ? `Person: ${meta.interpretation.personFilter}`
+      : null,
+    meta.interpretation.categoryFilter
+      ? `Category: ${meta.interpretation.categoryFilter}`
+      : null,
+    meta.interpretation.periodQuery
+      ? `Period: ${meta.interpretation.periodQuery}`
+      : null,
+    `AI read: ${Math.round(meta.interpretation.confidence * 100)}%`,
+  ].filter(Boolean);
+
+  return parts.join(" • ");
+}
+
 type AskAiWorkspaceProps = {
   timezone: string;
   preferredLanguage: PreferredLanguageValue;
@@ -382,7 +404,7 @@ export function AskAiWorkspace({
                       : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
-                  Chatting
+                  Chat
                 </button>
                 <button
                   type="button"
@@ -464,15 +486,25 @@ export function AskAiWorkspace({
                               const retrievalBadge = getRetrievalBadge(
                                 message.answerMeta,
                               );
+                              const interpretationSummary = getInterpretationSummary(
+                                message.answerMeta,
+                              );
 
                               return (
-                                <div
-                                  className={`inline-flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${retrievalBadge.className}`}
-                                >
-                                  <span>{retrievalBadge.label}</span>
-                                  <span className="opacity-80">
-                                    {retrievalBadge.detail}
-                                  </span>
+                                <div className="space-y-2">
+                                  <div
+                                    className={`inline-flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${retrievalBadge.className}`}
+                                  >
+                                    <span>{retrievalBadge.label}</span>
+                                    <span className="opacity-80">
+                                      {retrievalBadge.detail}
+                                    </span>
+                                  </div>
+                                  {interpretationSummary ? (
+                                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-medium text-gray-500">
+                                      {interpretationSummary}
+                                    </div>
+                                  ) : null}
                                 </div>
                               );
                             })()}
@@ -654,15 +686,25 @@ export function AskAiWorkspace({
                               const retrievalBadge = getRetrievalBadge(
                                 message.answerMeta,
                               );
+                              const interpretationSummary = getInterpretationSummary(
+                                message.answerMeta,
+                              );
 
                               return (
-                                <div
-                                  className={`inline-flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${retrievalBadge.className}`}
-                                >
-                                  <span>{retrievalBadge.label}</span>
-                                  <span className="opacity-80">
-                                    {retrievalBadge.detail}
-                                  </span>
+                                <div className="space-y-2">
+                                  <div
+                                    className={`inline-flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${retrievalBadge.className}`}
+                                  >
+                                    <span>{retrievalBadge.label}</span>
+                                    <span className="opacity-80">
+                                      {retrievalBadge.detail}
+                                    </span>
+                                  </div>
+                                  {interpretationSummary ? (
+                                    <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[11px] font-medium text-gray-500">
+                                      {interpretationSummary}
+                                    </div>
+                                  ) : null}
                                 </div>
                               );
                             })()}

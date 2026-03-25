@@ -440,7 +440,7 @@ export function PersonLedgerWorkspace({ currency }: { currency: CurrencyCodeValu
             {summary.netReceivable > 0 ? (
               <div className="rounded-lg border-2 border-orange-300 bg-orange-50 p-4">
                 <p className="text-xs font-semibold text-orange-600">
-                  {selectedPerson.personName} se lena baki
+                  To receive from {selectedPerson.personName}
                 </p>
                 <p className="mt-1 font-mono text-2xl font-bold text-orange-700">
                   {formatMoney(summary.netReceivable, currency)}
@@ -451,7 +451,7 @@ export function PersonLedgerWorkspace({ currency }: { currency: CurrencyCodeValu
             {summary.netPayable > 0 ? (
               <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
                 <p className="text-xs font-semibold text-amber-600">
-                  {selectedPerson.personName} ko dena baki
+                  To pay {selectedPerson.personName}
                 </p>
                 <p className="mt-1 font-mono text-2xl font-bold text-amber-700">
                   {formatMoney(summary.netPayable, currency)}
@@ -531,7 +531,7 @@ export function PersonLedgerWorkspace({ currency }: { currency: CurrencyCodeValu
       <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Udhaar Book</h2>
+            <h2 className="text-xl font-bold text-gray-900">People Ledger</h2>
             <p className="mt-0.5 text-sm text-gray-500">
               Track who owes what and manage person aliases in one place.
             </p>
@@ -544,7 +544,7 @@ export function PersonLedgerWorkspace({ currency }: { currency: CurrencyCodeValu
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <div className="rounded-lg border border-orange-100 bg-orange-50 p-3 text-center">
             <p className="text-[11px] font-medium uppercase tracking-wider text-orange-400">
-              Total lena baki
+              Total to receive
             </p>
             <p className="mt-1 font-mono text-xl font-bold text-orange-700">
               {formatMoney(totalReceivable, currency)}
@@ -552,7 +552,7 @@ export function PersonLedgerWorkspace({ currency }: { currency: CurrencyCodeValu
           </div>
           <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-center">
             <p className="text-[11px] font-medium uppercase tracking-wider text-amber-500">
-              Total dena baki
+              Total to pay
             </p>
             <p className="mt-1 font-mono text-xl font-bold text-amber-700">
               {formatMoney(totalPayable, currency)}
@@ -690,29 +690,33 @@ export function PersonLedgerWorkspace({ currency }: { currency: CurrencyCodeValu
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {person.netReceivable > 0 ? (
                   <div className="rounded-lg border border-orange-100 bg-orange-50 px-2.5 py-1.5">
-                    <p className="text-[10px] font-medium text-orange-400">Lena baki</p>
+                    <p className="text-[10px] font-medium text-orange-400">To receive</p>
                     <p className="font-mono text-sm font-bold text-orange-700">
                       {formatMoney(person.netReceivable, currency)}
                     </p>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5">
-                    <p className="text-[10px] font-medium text-gray-400">Lena baki</p>
-                    <p className="font-mono text-sm font-bold text-gray-400">Rs 0</p>
+                    <p className="text-[10px] font-medium text-gray-400">To receive</p>
+                    <p className="font-mono text-sm font-bold text-gray-400">
+                      {formatMoney(0, currency)}
+                    </p>
                   </div>
                 )}
 
                 {person.netPayable > 0 ? (
                   <div className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-1.5">
-                    <p className="text-[10px] font-medium text-amber-500">Dena baki</p>
+                    <p className="text-[10px] font-medium text-amber-500">To pay</p>
                     <p className="font-mono text-sm font-bold text-amber-700">
                       {formatMoney(person.netPayable, currency)}
                     </p>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-1.5">
-                    <p className="text-[10px] font-medium text-gray-400">Dena baki</p>
-                    <p className="font-mono text-sm font-bold text-gray-400">Rs 0</p>
+                    <p className="text-[10px] font-medium text-gray-400">To pay</p>
+                    <p className="font-mono text-sm font-bold text-gray-400">
+                      {formatMoney(0, currency)}
+                    </p>
                   </div>
                 )}
               </div>

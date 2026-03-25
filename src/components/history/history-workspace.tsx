@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { formatMoney } from "@/lib/settings/currency";
+import type { CurrencyCodeValue } from "@/lib/settings/settings-contract";
 import type { HistoryPageData } from "@/lib/ledger/history-types";
 
 type HistoryWorkspaceProps = {
   historyPageData: HistoryPageData;
+  currency: CurrencyCodeValue;
   basePath?: string;
   sectionId?: string;
 };
@@ -57,10 +60,6 @@ function getTypeColor(entryType: string) {
   return typeColorMap[entryType] ?? "bg-gray-50 text-gray-600 border-gray-200";
 }
 
-function formatCurrency(amount: number) {
-  return `₹${amount.toLocaleString("en-IN")}`;
-}
-
 function formatEntryType(entryType: string) {
   return entryType.replaceAll("_", " ").toLowerCase();
 }
@@ -102,6 +101,7 @@ function buildHistoryHref(params: {
 
 export function HistoryWorkspace({
   historyPageData,
+  currency,
   basePath = "/history",
   sectionId,
 }: HistoryWorkspaceProps) {
@@ -287,7 +287,7 @@ export function HistoryWorkspace({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-mono text-lg font-bold text-gray-900">
-                    {formatCurrency(entry.amount)}
+                    {formatMoney(entry.amount, currency)}
                   </p>
                   <span className={`mt-1.5 inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold capitalize ${getTypeColor(entry.entryType)}`}>
                     {formatEntryType(entry.entryType)}
@@ -337,7 +337,7 @@ export function HistoryWorkspace({
                 historyPageData.page <= 1 ? "pointer-events-none opacity-50" : ""
               }`}
             >
-              ← Previous
+              Previous
             </Link>
             <Link
               href={buildHistoryHref({
@@ -355,7 +355,7 @@ export function HistoryWorkspace({
                   : ""
               }`}
             >
-              Next →
+              Next
             </Link>
           </div>
         </div>
@@ -375,7 +375,7 @@ export function HistoryWorkspace({
                   <span className="text-xs text-gray-400">{openEntry.entryDate.slice(0, 10)}</span>
                 </div>
                 <h3 className="mt-2 font-mono text-2xl font-bold text-gray-900">
-                  {formatCurrency(openEntry.amount)}
+                  {formatMoney(openEntry.amount, currency)}
                 </h3>
               </div>
               <button
@@ -417,7 +417,7 @@ export function HistoryWorkspace({
                   disabled={isPending || openEntry.correctionCount === 0}
                   className="secondary-button rounded-lg px-3.5 py-2 text-sm font-medium disabled:opacity-50"
                 >
-                  ↩ Undo last correction
+                  Undo last correction
                 </button>
               </div>
             </div>
